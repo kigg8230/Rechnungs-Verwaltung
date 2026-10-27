@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rechnungs-LOG | Vermittler & Inkasso-Verwaltung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    [v-cloak] { display: none; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center font-bold text-slate-900 text-lg shadow">
+            RL
+          </div>
+          <div>
+            <h1 class="font-bold text-lg leading-tight tracking-tight">Rechnungs-LOG</h1>
+            <p class="text-xs text-slate-400">Warenausgabe & Inkasso-Kontrolle</p>
+          </div>
+        </div>
+
+        <!-- MAIN TABS -->
+        <nav class="flex items-center gap-1 ml-4 bg-slate-800 p-1 rounded-lg">
+          <button onclick="switchTab('customers')" id="tab-btn-customers"
+            class="px-3.5 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2 bg-emerald-600 text-white">
+            <span>👥</span> Kunden & Chronik
+          </button>
+          <button onclick="switchTab('global')" id="tab-btn-global"
+            class="px-3.5 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2 text-slate-300 hover:text-white hover:bg-slate-700">
+            <span>📊</span> Gesamtliste / Zeitraum
+          </button>
+          <button onclick="switchTab('settings')" id="tab-btn-settings"
+            class="px-3.5 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2 text-slate-300 hover:text-white hover:bg-slate-700">
+            <span>⚙️</span> Einstellungen
+          </button>
+        </nav>
+      </div>
+
+      <!-- UNDO & HISTORY CONTROLS -->
+      <div class="flex items-center gap-2 relative">
+        <button onclick="undoLastAction()" id="undo-btn" disabled
+          class="px-3.5 py-1.5 rounded-lg text-sm font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500 hover:text-slate-950 transition disabled:opacity-40 disabled:pointer-events-none flex items-center gap-1.5"
+          title="Letzte Änderung rückgängig machen">
+          <span>↩</span> <span id="undo-btn-label">Rückgängig</span>
+        </button>
+        <button onclick="toggleAuditDropdown()" id="audit-dropdown-btn"
+          class="px-2.5 py-1.5 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+          title="Verlauf der letzten Änderungen anzeigen">
+          🕒 <span id="audit-count-badge" class="text-xs bg-slate-700 px-1.5 py-0.5 rounded">0</span>
+        </button>
+
+        <!-- Audit Log Dropdown -->
+        <div id="audit-dropdown" class="hidden absolute right-0 top-12 w-96 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+          <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="font-semibold text-sm text-slate-700">Letzte Änderungen (Undo-Historie)</span>
+            <button onclick="toggleAuditDropdown()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+          </div>
+          <div id="audit-list" class="max-h-80 overflow-y-auto divide-y divide-slate-100 text-sm">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 no-print"></div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1">
+
+    <!-- ==================== TAB 1: CUSTOMERS & CHRONOLOGICAL INVOICES ==================== -->
+    <section id="view-customers" class="flex flex-col gap-6">
+
+      <!-- TOP BAR: CUSTOMER DIRECTORY & SEARCH -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-3.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-1.5">
+              <span>👥</span> Kundenverzeichnis
+            </h2>
+            <span id="customer-total-badge" class="text-xs bg-slate-200 text-slate-700 font-semibold px-2 py-0.5 rounded-full">0 Kunden</span>
+          </div>
+
+          <div class="flex items-center gap-2.5 flex-1 max-w-xl">
+            <div class="relative flex-1">
+              <input type="text" id="customer-search" oninput="renderCustomerList()"
+                placeholder="🔍 Kunde, Vorname, Ort, Straße oder PLZ suchen..."
+                class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+            <button onclick="openCustomerModal()"
+              class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1 shrink-0">
+              <span>＋</span> Neuer Kunde
+            </button>
+          </div>
+        </div>
+
+        <!-- Horizontal / Compact Grid of Customers -->
+        <div id="customer-list" class="p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-44 overflow-y-auto scrollbar-thin bg-slate-50/30">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- FULL WIDTH AREA: SELECTED CUSTOMER DETAILS + PDF ARCHIVE + CHRONOLOGICAL INVOICES -->
+      <div class="w-full flex flex-col gap-6">
+
+        <!-- Empty State when no customer is selected -->
+        <div id="no-customer-selected" class="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+          <div class="text-5xl mb-3">📦</div>
+          <h3 class="text-lg font-bold text-slate-700">Kein Kunde ausgewählt</h3>
+          <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+            Wähle oben im Kundenverzeichnis einen Kunden aus oder lege einen neuen Kunden an, um Versandadresse, Dokumente (PDFs) und die chronologische Rechnungsliste zu verwalten.
+          </p>
+          <button onclick="openCustomerModal()"
+            class="mt-5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow transition">
+            ＋ Ersten Kunden anlegen
+          </button>
+        </div>
+
+        <!-- Customer Detail Container -->
+        <div id="customer-detail-container" class="hidden flex flex-col gap-6">
+
+          <!-- 1. CUSTOMER MASTER DATA & NOTES + PDF DOCUMENTS -->
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+            <!-- Master Data Card -->
+            <div class="xl:col-span-7 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+              <div>
+                <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
+                  <div>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-emerald-600">Kundenstammdaten & Versand</span>
+                    <h2 id="detail-customer-name" class="text-xl font-bold text-slate-900 mt-0.5"></h2>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button onclick="copyShippingAddress()"
+                      class="px-2.5 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
+                      title="Versandadresse in Zwischenablage kopieren">
+                      📋 Adresse kopieren
+                    </button>
+                    <button onclick="openCustomerModal(currentCustomer.id)"
+                      class="px-2.5 py-1.5 text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition">
+                      ✏️ Bearbeiten
+                    </button>
+                    <button onclick="deleteCurrentCustomer()"
+                      class="px-2.5 py-1.5 text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition"
+                      title="Kunde löschen">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
+                  <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div class="text-xs font-semibold text-slate-400 uppercase mb-1">📬 Versandadresse</div>
+                    <div id="detail-customer-address" class="text-slate-800 font-medium whitespace-pre-line"></div>
+                  </div>
+                  <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                    <div class="text-xs font-semibold text-slate-400 uppercase mb-1">📞 Kontakt</div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-slate-400">Tel:</span>
+                      <span id="detail-customer-phone" class="font-medium text-slate-800"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-slate-400">E-Mail:</span>
+                      <span id="detail-customer-email" class="font-medium text-slate-800 break-all"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Editable Notes -->
+              <div class="mt-4">
+                <div class="flex items-center justify-between mb-1">
+                  <label for="detail-customer-notes" class="text-xs font-semibold text-slate-500 uppercase">📝 Freie Notizen zum Kunden</label>
+                  <span id="notes-save-indicator" class="text-xs text-emerald-600 hidden">✓ Gespeichert</span>
+                </div>
+                <textarea id="detail-customer-notes" rows="2" onblur="saveCustomerNotes()"
+                  placeholder="Notizen hier eingeben (wird beim Verlassen des Feldes automatisch gespeichert)..."
+                  class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-amber-50/30"></textarea>
+              </div>
+            </div>
+
+            <!-- Customer PDF Documentation Box -->
+            <div class="xl:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <span class="text-xs uppercase tracking-wider font-semibold text-blue-600">Dokumentation</span>
+                    <h3 class="text-base font-bold text-slate-800">📄 PDF-Ablage beim Kunden</h3>
+                  </div>
+                  <span id="detail-doc-count" class="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-1 rounded-full">0 PDFs</span>
+                </div>
+
+                <!-- Upload Form -->
+                <form id="customer-pdf-form" onsubmit="uploadCustomerPdf(event)" class="mt-3 flex flex-col gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200 border-dashed">
+                  <input type="file" id="customer-pdf-input" accept="application/pdf,.pdf" required
+                    class="text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
+                  <div class="flex gap-2">
+                    <input type="text" id="customer-pdf-desc" placeholder="Kurzbeschreibung / Notiz zum PDF (optional)"
+                      class="flex-1 px-2.5 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                    <button type="submit"
+                      class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-md transition shrink-0">
+                      Hochladen
+                    </button>
+                  </div>
+                </form>
+
+                <!-- Document List -->
+                <div id="customer-doc-list" class="mt-3 max-h-36 overflow-y-auto divide-y divide-slate-100 text-xs">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. CHRONOLOGICAL INVOICE LIST & NEW INVOICE ENTRY -->
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>📅</span> Chronologische Rechnungs- & Inkasso-Liste
+                </h3>
+                <p class="text-xs text-slate-500">Klicke auf ✅ (Bezahlt) oder ❌ (Offen), um den Zahlungsstatus direkt umzuschalten.</p>
+              </div>
+
+              <!-- Filter Bar for Current Customer -->
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-medium">
+                  <button onclick="setCustomerInvoiceFilter('all')" id="cust-filter-all"
+                    class="px-2.5 py-1 rounded-md bg-slate-800 text-white transition">Alle</button>
+                  <button onclick="setCustomerInvoiceFilter('unpaid')" id="cust-filter-unpaid"
+                    class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">❌ Nur Unbezahlt</button>
+                  <button onclick="setCustomerInvoiceFilter('paid')" id="cust-filter-paid"
+                    class="px-2.5 py-1 rounded-md text-slate-600 hover:bg-slate-100 transition">✅ Nur Bezahlt</button>
+                </div>
+
+                <select id="cust-invoice-sort" onchange="renderCustomerInvoices()"
+                  class="px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white text-slate-700 font-medium focus:outline-none">
+                  <option value="date_desc">Datum (Neueste zuerst)</option>
+                  <option value="date_asc">Datum (Chronologisch aufsteigend)</option>
+                  <option value="number_asc">Rechnungs-Nr. (Aufsteigend)</option>
+                  <option value="number_desc">Rechnungs-Nr. (Absteigend)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- NEW INVOICE BAR (Maximized width for Free Text, compact Invoice Number & Amount) -->
+            <form id="new-invoice-form" onsubmit="createCustomerInvoice(event)"
+              class="p-4 bg-emerald-50/60 border-b border-emerald-200/80 flex flex-wrap lg:flex-nowrap gap-2.5 items-end">
+
+              <div class="w-32 shrink-0">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Datum</label>
+                <input type="date" id="inv-date" required onchange="updateInvoiceNumberPreview()"
+                  class="w-full px-2 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div class="w-28 shrink-0">
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Rechn.-Nr.</span>
+                  <button type="button" onclick="updateInvoiceNumberPreview(true)" class="text-[10px] text-emerald-700 hover:underline" title="Nächste freie Nummer laut Schema laden">↻</button>
+                </label>
+                <input type="text" id="inv-number" required placeholder="2026-00001"
+                  class="w-full px-2 py-2 text-xs font-mono border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div class="flex-1 min-w-[260px]">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Freier Text / Waren / Notiz</label>
+                <input type="text" id="inv-desc" placeholder="Positionen, Lieferschein, Seriennummer, Bemerkung..."
+                  class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div class="w-24 shrink-0">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Betrag (€)</label>
+                <input type="number" step="0.01" id="inv-amount" required placeholder="0,00"
+                  class="w-full px-2 py-2 text-xs font-semibold text-right border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+
+              <div class="w-36 shrink-0">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Beleg-PDF (opt.)</label>
+                <input type="file" id="inv-pdf" accept="application/pdf,.pdf"
+                  class="w-full text-[11px] text-slate-600 file:mr-1.5 file:py-1 file:px-2 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-slate-100 file:text-slate-700 border border-slate-300 rounded-lg bg-white p-1" />
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" id="inv-paid-toggle" onclick="toggleNewInvoicePaidState()"
+                  class="px-2.5 py-2 rounded-lg border border-rose-300 bg-rose-50 text-rose-700 font-bold text-xs hover:bg-rose-100 transition shrink-0"
+                  title="Startstatus: Unbezahlt (Rotes X) oder Bezahlt (Grüner Haken)">
+                  ❌
+                </button>
+                <button type="submit"
+                  class="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg shadow transition whitespace-nowrap">
+                  ＋ Buchen
+                </button>
+              </div>
+            </form>
+
+            <!-- INVOICES TABLE -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                    <th class="py-2.5 px-3 w-24 whitespace-nowrap">Datum</th>
+                    <th class="py-2.5 px-3 w-28 whitespace-nowrap">Rechn.-Nr.</th>
+                    <th class="py-2.5 px-4 w-full">Freier Text / Beschreibung</th>
+                    <th class="py-2.5 px-2 w-16 text-center whitespace-nowrap">PDF</th>
+                    <th class="py-2.5 px-3 w-24 text-right whitespace-nowrap">Betrag</th>
+                    <th class="py-2.5 px-3 w-28 text-center whitespace-nowrap">Status</th>
+                    <th class="py-2.5 px-3 w-20 text-right whitespace-nowrap">Aktion</th>
+                  </tr>
+                </thead>
+                <tbody id="customer-invoices-tbody" class="divide-y divide-slate-100 text-sm">
+                  <!-- Populated by JS -->
+                </tbody>
+                <tfoot id="customer-invoices-tfoot" class="bg-slate-50 border-t-2 border-slate-200 font-semibold text-sm">
+                  <!-- Totals populated by JS -->
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: GLOBAL INVOICE REPORT (BY PERIOD & SORTED BY NUMBER) ==================== -->
+    <section id="view-global" class="hidden flex flex-col gap-6">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-emerald-600">Kundenübergreifende Auswertung</span>
+            <h2 class="text-xl font-bold text-slate-900">📊 Gesamte Rechnungsliste & Zeitraum-Kontrolle</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Alle Kunden über einen bestimmten Zeitraum gefiltert und nach Rechnungsnummer sortiert.</p>
+          </div>
+          <div class="flex items-center gap-2 no-print">
+            <button onclick="exportGlobalCsv()"
+              class="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5">
+              📥 CSV / Excel Export
+            </button>
+            <button onclick="window.print()"
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+              🖨️ Drucken
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTER CONTROLS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mt-4 items-end no-print">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Von Datum</label>
+            <input type="date" id="global-from" onchange="loadGlobalInvoices()"
+              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Bis Datum</label>
+            <input type="date" id="global-to" onchange="loadGlobalInvoices()"
+              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Zahlungsstatus</label>
+            <select id="global-status" onchange="loadGlobalInvoices()"
+              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="all">Alle Rechnungen</option>
+              <option value="unpaid">❌ Nur Unbezahlte (Offen)</option>
+              <option value="paid">✅ Nur Bezahlte</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Sortierung</label>
+            <select id="global-sort" onchange="loadGlobalInvoices()"
+              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="number_asc">Rechnungs-Nr. (Aufsteigend ↑)</option>
+              <option value="number_desc">Rechnungs-Nr. (Absteigend ↓)</option>
+              <option value="date_asc">Datum (Chronologisch ↑)</option>
+              <option value="date_desc">Datum (Neueste zuerst ↓)</option>
+              <option value="amount_desc">Betrag (Höchste zuerst ↓)</option>
+            </select>
+          </div>
+          <div class="lg:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Schnellsuche (Rechnungs-Nr., Kunde, Text)</label>
+            <input type="text" id="global-search" oninput="loadGlobalInvoices()" placeholder="Suchen..."
+              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <!-- QUICK PERIOD PRESETS -->
+        <div class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 text-xs no-print">
+          <span class="text-slate-400 font-medium">Schnellauswahl Zeitraum:</span>
+          <button onclick="setGlobalPeriod('all')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Gesamter Zeitraum</button>
+          <button onclick="setGlobalPeriod('this_month')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Dieser Monat</button>
+          <button onclick="setGlobalPeriod('last_month')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Letzter Monat</button>
+          <button onclick="setGlobalPeriod('this_year')" class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium">Dieses Jahr</button>
+        </div>
+      </div>
+
+      <!-- SUMMARY KPI CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <div class="text-xs font-semibold uppercase text-slate-400">Gesamtumsatz (im Filter)</div>
+          <div id="global-sum-total" class="text-2xl font-bold text-slate-900 mt-1">0,00 €</div>
+          <div id="global-count-total" class="text-xs text-slate-500 mt-0.5">0 Rechnungen</div>
+        </div>
+        <div class="bg-emerald-50/70 p-4 rounded-xl shadow-sm border border-emerald-200">
+          <div class="text-xs font-semibold uppercase text-emerald-700">✅ Bereits Bezahlt (Inkasso erledigt)</div>
+          <div id="global-sum-paid" class="text-2xl font-bold text-emerald-700 mt-1">0,00 €</div>
+          <div id="global-count-paid" class="text-xs text-emerald-600 mt-0.5">0 Rechnungen</div>
+        </div>
+        <div class="bg-rose-50/70 p-4 rounded-xl shadow-sm border border-rose-200">
+          <div class="text-xs font-semibold uppercase text-rose-700">❌ Noch Offen (Ausstehend)</div>
+          <div id="global-sum-unpaid" class="text-2xl font-bold text-rose-700 mt-1">0,00 €</div>
+          <div id="global-count-unpaid" class="text-xs text-rose-600 mt-0.5">0 Rechnungen</div>
+        </div>
+      </div>
+
+      <!-- GLOBAL TABLE -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                <th class="py-2.5 px-3 w-28 whitespace-nowrap">Rechn.-Nr.</th>
+                <th class="py-2.5 px-3 w-24 whitespace-nowrap">Datum</th>
+                <th class="py-2.5 px-3 w-48">Kunde & Ort</th>
+                <th class="py-2.5 px-4 w-full">Freier Text / Positionen</th>
+                <th class="py-2.5 px-2 w-16 text-center whitespace-nowrap">PDF</th>
+                <th class="py-2.5 px-3 w-24 text-right whitespace-nowrap">Betrag</th>
+                <th class="py-2.5 px-3 w-28 text-center whitespace-nowrap">Status</th>
+              </tr>
+            </thead>
+            <tbody id="global-invoices-tbody" class="divide-y divide-slate-100 text-sm">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: SETTINGS (INVOICE NUMBER SCHEMA) ==================== -->
+    <section id="view-settings" class="hidden max-w-3xl mx-auto">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="border-b border-slate-100 pb-4">
+          <span class="text-xs uppercase tracking-wider font-semibold text-emerald-600">Konfiguration</span>
+          <h2 class="text-xl font-bold text-slate-900 mt-0.5">⚙️ Rechnungsnummern-Schema definieren</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            Lege das Pre- und Post-Schema sowie die Stellenanzahl für die fortlaufende Nummerierung fest.
+          </p>
+        </div>
+
+        <form onsubmit="saveSettings(event)" class="mt-6 space-y-5">
+          <!-- Preset Buttons -->
+          <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500 uppercase mb-2">Schnell-Vorlagen (Beispiele):</div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="applySchemaPreset('{YYYY}-', '', 5)"
+                class="px-3 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-md hover:border-emerald-500 hover:text-emerald-700 transition">
+                Beispiel 1: <code>{YYYY}-00001</code> (z.B. 2026-00001)
+              </button>
+              <button type="button" onclick="applySchemaPreset('', '/{YYYY}', 5)"
+                class="px-3 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-md hover:border-emerald-500 hover:text-emerald-700 transition">
+                Beispiel 2: <code>00001/{YYYY}</code> (z.B. 00001/2026)
+              </button>
+              <button type="button" onclick="applySchemaPreset('RE-{YYYY}-', '', 4)"
+                class="px-3 py-1.5 text-xs font-medium bg-white border border-slate-300 rounded-md hover:border-emerald-500 hover:text-emerald-700 transition">
+                Beispiel 3: <code>RE-{YYYY}-0001</code>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Pre-Schema (Vor der Nummer)</label>
+              <input type="text" id="set-prefix" oninput="updateSettingsLivePreview()" placeholder="z.B. {YYYY}-"
+                class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Anzahl Stellen (Numerisch)</label>
+              <input type="number" min="1" max="10" id="set-digits" required oninput="updateSettingsLivePreview()"
+                class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Post-Schema (Nach der Nummer)</label>
+              <input type="text" id="set-suffix" oninput="updateSettingsLivePreview()" placeholder="z.B. /{YYYY}"
+                class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-500 bg-blue-50/60 border border-blue-100 rounded-lg p-3">
+            <strong>Verfügbare Platzhalter:</strong>
+            <code>{YYYY}</code> = 4-stelliges Jahr (z.B. 2026),
+            <code>{YY}</code> = 2-stelliges Jahr (z.B. 26),
+            <code>{MM}</code> = Monat (01–12),
+            <code>{DD}</code> = Tag (01–31).
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Nächste laufende Nummer (Zähler)</label>
+              <input type="number" min="1" id="set-next-seq" required oninput="updateSettingsLivePreview()"
+                class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <p class="text-[11px] text-slate-400 mt-1">Wird bei jeder neuen Rechnung automatisch um 1 erhöht.</p>
+            </div>
+
+            <div class="flex items-center pt-5">
+              <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" id="set-yearly-reset" class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" />
+                <span class="text-sm text-slate-700 font-medium">Zähler bei Jahreswechsel automatisch auf 1 zurücksetzen</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Live Preview Box -->
+          <div class="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Live-Vorschau der nächsten Rechnungsnummer</div>
+              <div id="set-live-preview" class="text-2xl font-mono font-bold text-emerald-400 mt-1">2026-00001</div>
+            </div>
+            <button type="submit"
+              class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-lg shadow transition">
+              💾 Einstellungen speichern
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODAL: CREATE / EDIT CUSTOMER ==================== -->
+  <div id="customer-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <h3 id="customer-modal-title" class="font-bold text-lg text-slate-900">Neuen Kunden anlegen</h3>
+        <button onclick="closeCustomerModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <form id="customer-modal-form" onsubmit="submitCustomerModal(event)" class="p-6 space-y-4">
+        <input type="hidden" id="cust-modal-id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Name / Nachname / Firma *</label>
+            <input type="text" id="cust-modal-lastname" required placeholder="Mustermann"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Vorname</label>
+            <input type="text" id="cust-modal-firstname" placeholder="Max"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Straße und Hausnummer (Versand)</label>
+          <input type="text" id="cust-modal-street" placeholder="Musterstraße 12a"
+            class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">PLZ</label>
+            <input type="text" id="cust-modal-zip" placeholder="1010"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Ort</label>
+            <input type="text" id="cust-modal-city" placeholder="Wien / Berlin"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Telefonnummer</label>
+            <input type="text" id="cust-modal-phone" placeholder="+43 664 ..."
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">E-Mail-Adresse</label>
+            <input type="email" id="cust-modal-email" placeholder="kunde@example.com"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Freie Notizen</label>
+          <textarea id="cust-modal-notes" rows="3" placeholder="Besondere Vereinbarungen, Lieferhinweise..."
+            class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeCustomerModal()"
+            class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">
+            Abbrechen
+          </button>
+          <button type="submit"
+            class="px-5 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow transition">
+            Speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: EDIT INVOICE ==================== -->
+  <div id="invoice-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden">
+      <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-bold text-lg text-slate-900">Rechnungseintrag bearbeiten</h3>
+        <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <form onsubmit="submitInvoiceModal(event)" class="p-6 space-y-4">
+        <input type="hidden" id="edit-inv-id" />
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Datum</label>
+            <input type="date" id="edit-inv-date" required
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Rechnungs-Nr.</label>
+            <input type="text" id="edit-inv-number" required
+              class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Freier Text / Beschreibung</label>
+          <input type="text" id="edit-inv-desc"
+            class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Rechnungsbetrag (€)</label>
+            <input type="number" step="0.01" id="edit-inv-amount" required
+              class="w-full px-3 py-2 text-sm font-semibold border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Zahlungsstatus</label>
+            <select id="edit-inv-paid"
+              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="0">❌ Noch nicht bezahlt</option>
+              <option value="1">✅ Bezahlt</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">PDF-Beleg ersetzen / anhängen (optional)</label>
+          <input type="file" id="edit-inv-pdf" accept="application/pdf,.pdf"
+            class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-700" />
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeInvoiceModal()"
+            class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">
+            Abbrechen
+          </button>
+          <button type="submit"
+            class="px-5 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow transition">
+            Änderungen speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
