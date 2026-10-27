@@ -1,15 +1,17 @@
 services:
   rechnungs-log:
     build: .
-    container_name: rechnungs-log
+    container_name: ${CONTAINER_NAME:-rechnungs-log}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${HOST_PORT:-3000}:3000"
     volumes:
       - ./data:/app/data
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-rechnungen2026}
     networks:
       - default
       - proxy-network
@@ -17,4 +19,5 @@ services:
 networks:
   proxy-network:
     external: true
+
 
