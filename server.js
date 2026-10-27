@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const { DatabaseSync } = require('node:sqlite');
 
@@ -20,8 +21,34 @@ const db = new DatabaseSync(dbPath);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
 
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash || !storedHash.includes(':')) return false;
+  const [salt, key] = storedHash.split(':');
+  const hashBuffer = crypto.scryptSync(String(password), salt, 64);
+  const keyBuffer = Buffer.from(key, 'hex');
+  if (hashBuffer.length !== keyBuffer.length) return false;
+  return crypto.timingSafeEqual(hashBuffer, keyBuffer);
+}
+
 // Create tables
 db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    username TEXT NOT NULL DEFAULT 'admin',
+    password_hash TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     prefix_schema TEXT NOT NULL DEFAULT '{YYYY}-',
@@ -87,9 +114,110 @@ db.exec(`
   );
 `);
 
+// Ensure default user exists (admin / rechnungen2026 or via env vars)
+const existingUser = db.prepare('SELECT * FROM users WHERE id = 1').get();
+if (!existingUser) {
+  const initUser = process.env.ADMIN_USER || 'admin';
+  const initPass = process.env.ADMIN_PASSWORD || 'rechnungen2026';
+  db.prepare('INSERT INTO users (id, username, password_hash) VALUES (1, ?, ?)').run(initUser, hashPassword(initPass));
+}
+
+// Helper: Parse cookies
+function parseCookies(req) {
+  const list = {};
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach(cookie => {
+    let [name, ...rest] = cookie.split('=');
+    name = name?.trim();
+    if (!name) return;
+    const value = rest.join('=').trim();
+    list[name] = decodeURIComponent(value);
+  });
+  return list;
+}
+
+function getValidSession(req) {
+  const cookies = parseCookies(req);
+  const token = cookies['rl_session'];
+  if (!token) return null;
+  const session = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  if (!session) return null;
+  if (Date.now() > session.expires_at) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+    return null;
+  }
+  return session;
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Auth Endpoints (unprotected)
+app.get('/api/auth/status', (req, res) => {
+  const session = getValidSession(req);
+  if (!session) return res.status(401).json({ authenticated: false });
+  const user = db.prepare('SELECT username FROM users WHERE id = 1').get();
+  res.json({ authenticated: true, username: user ? user.username : session.username });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username = '', password = '' } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE id = 1').get();
+
+  if (!user || username.trim().toLowerCase() !== user.username.toLowerCase() || !verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Benutzername oder Passwort ist falsch!' });
+  }
+
+  // Clean expired sessions
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
+  db.prepare('INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)').run(token, user.username, expiresAt);
+
+  res.setHeader('Set-Cookie', `rl_session=${token}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 30}; SameSite=Lax`);
+  res.json({ success: true, username: user.username });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const cookies = parseCookies(req);
+  if (cookies['rl_session']) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(cookies['rl_session']);
+  }
+  res.setHeader('Set-Cookie', 'rl_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+  res.json({ success: true });
+});
+
+// Protect all /api/* and /uploads/* routes below
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+    const session = getValidSession(req);
+    if (!session) {
+      return res.status(401).json({ error: 'Nicht angemeldet. Bitte zuerst einloggen.' });
+    }
+  }
+  next();
+});
+
+app.put('/api/auth/credentials', (req, res) => {
+  const { current_password = '', new_username = '', new_password = '' } = req.body;
+  const user = db.prepare('SELECT * FROM users WHERE id = 1').get();
+
+  if (!verifyPassword(current_password, user.password_hash)) {
+    return res.status(400).json({ error: 'Das aktuelle Passwort ist nicht korrekt.' });
+  }
+  const cleanUser = new_username.trim() || user.username;
+  if (new_password && new_password.length < 4) {
+    return res.status(400).json({ error: 'Das neue Passwort muss mindestens 4 Zeichen lang sein.' });
+  }
+
+  const newHash = new_password ? hashPassword(new_password) : user.password_hash;
+  db.prepare('UPDATE users SET username = ?, password_hash = ? WHERE id = 1').run(cleanUser, newHash);
+  res.json({ success: true, username: cleanUser });
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Multer setup for PDF uploads

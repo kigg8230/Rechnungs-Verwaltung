@@ -7,15 +7,81 @@ let globalInvoices = [];
 let appSettings = null;
 let auditLogs = [];
 
-// ==================== INITIALIZATION ====================
+// ==================== INITIALIZATION & AUTH ====================
 document.addEventListener('DOMContentLoaded', async () => {
   setTodayOnInvoiceInput();
-  await Promise.all([
-    loadSettings(),
-    loadCustomers(),
-    loadAuditLogs()
-  ]);
+  await checkAuthAndInit();
 });
+
+async function checkAuthAndInit() {
+  const res = await fetch('/api/auth/status');
+  if (res.ok) {
+    const data = await res.json();
+    document.getElementById('login-overlay').classList.add('hidden');
+    const newUserField = document.getElementById('cred-new-user');
+    if (newUserField) newUserField.value = data.username || 'admin';
+    await Promise.all([
+      loadSettings(),
+      loadCustomers(),
+      loadAuditLogs()
+    ]);
+  } else {
+    document.getElementById('login-overlay').classList.remove('hidden');
+    setTimeout(() => document.getElementById('login-username')?.focus(), 100);
+  }
+}
+
+async function submitLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+
+  if (res.ok) {
+    document.getElementById('login-password').value = '';
+    await checkAuthAndInit();
+    showToast('Erfolgreich angemeldet!');
+  } else {
+    const err = await res.json();
+    errEl.textContent = err.error || 'Anmeldung fehlgeschlagen';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function logoutUser() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  document.getElementById('login-overlay').classList.remove('hidden');
+  showToast('Erfolgreich abgemeldet.');
+}
+
+async function saveCredentials(e) {
+  e.preventDefault();
+  const current_password = document.getElementById('cred-current-pw').value;
+  const new_username = document.getElementById('cred-new-user').value;
+  const new_password = document.getElementById('cred-new-pw').value;
+
+  const res = await fetch('/api/auth/credentials', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ current_password, new_username, new_password })
+  });
+
+  if (res.ok) {
+    document.getElementById('cred-current-pw').value = '';
+    document.getElementById('cred-new-pw').value = '';
+    showToast('Zugangsdaten erfolgreich aktualisiert!');
+  } else {
+    const err = await res.json();
+    showToast(err.error || 'Fehler beim Aktualisieren der Zugangsdaten', 'error');
+  }
+}
 
 function setTodayOnInvoiceInput() {
   const today = new Date().toISOString().slice(0, 10);
