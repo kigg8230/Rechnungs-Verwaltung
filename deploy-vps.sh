@@ -55,6 +55,9 @@ fi
 # Persistente Ordner für SQLite-Datenbank und PDF-Uploads sicherstellen
 mkdir -p "$APP_DIR/data/uploads"
 
+# Sicherstellen, dass das externe Docker-Netzwerk proxy-network (für Nginx Proxy Manager) existiert
+docker network inspect proxy-network >/dev/null 2>&1 || docker network create proxy-network
+
 # Docker Container bauen und im Hintergrund starten
 echo "--> Baue und starte Docker-Container (rechnungs-log)..."
 docker compose up -d --build

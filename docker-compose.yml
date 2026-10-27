@@ -10,3 +10,11 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=production
+    networks:
+      - default
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true
+
