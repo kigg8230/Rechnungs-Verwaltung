@@ -470,9 +470,39 @@ app.get('/api/invoices', (req, res) => {
     params.push(to);
   }
   if (search && search.trim()) {
-    const q = `%${search.trim()}%`;
-    whereClauses.push('(i.invoice_number LIKE ? OR i.description LIKE ? OR c.last_name LIKE ? OR c.first_name LIKE ? OR c.city LIKE ?)');
-    params.push(q, q, q, q, q);
+    const raw = search.trim();
+    const q = `%${raw}%`;
+    // Normalize German amount input (e.g. "1.234,50 €" -> "1234.50", "45,80" -> "45.80")
+    const normalizedAmountStr = raw.replace(/[€\s]/g, '').replace(/\./g, '').replace(',', '.');
+    const qDot = `%${normalizedAmountStr}%`;
+    const qComma = `%${raw.replace(/[€\s]/g, '')}%`;
+    const parsedNum = Number(normalizedAmountStr);
+
+    if (!isNaN(parsedNum) && normalizedAmountStr !== '') {
+      whereClauses.push(`(
+        i.invoice_number LIKE ? OR
+        i.description LIKE ? OR
+        c.last_name LIKE ? OR
+        c.first_name LIKE ? OR
+        c.city LIKE ? OR
+        printf('%.2f', i.amount) LIKE ? OR
+        replace(printf('%.2f', i.amount), '.', ',') LIKE ? OR
+        CAST(i.amount AS TEXT) LIKE ? OR
+        ABS(i.amount - ?) < 0.005
+      )`);
+      params.push(q, q, q, q, q, qDot, qComma, qDot, parsedNum);
+    } else {
+      whereClauses.push(`(
+        i.invoice_number LIKE ? OR
+        i.description LIKE ? OR
+        c.last_name LIKE ? OR
+        c.first_name LIKE ? OR
+        c.city LIKE ? OR
+        printf('%.2f', i.amount) LIKE ? OR
+        replace(printf('%.2f', i.amount), '.', ',') LIKE ?
+      )`);
+      params.push(q, q, q, q, q, qDot, qComma);
+    }
   }
 
   const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
