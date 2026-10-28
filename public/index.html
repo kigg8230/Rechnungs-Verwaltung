@@ -3,8 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Rechnungs-LOG" />
   <title>Rechnungs-LOG | Inkasso-Verwaltung</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="/manifest.json" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     [v-cloak] { display: none; }
@@ -73,6 +79,12 @@
             <!-- Populated by JS -->
           </div>
         </div>
+
+        <button onclick="installPwaApp()" id="pwa-install-btn"
+          class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500 hover:text-slate-950 transition flex items-center gap-1.5"
+          title="Rechnungs-LOG als Desktop-App installieren">
+          <span>📲</span> App installieren
+        </button>
 
         <button onclick="logoutUser()"
           class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border border-slate-700 transition"

@@ -6,6 +6,37 @@ let newInvoicePaidState = false;
 let globalInvoices = [];
 let appSettings = null;
 let auditLogs = [];
+let deferredPwaPrompt = null;
+
+// ==================== PWA SERVICE WORKER & INSTALL PROMPT ====================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.classList.remove('hidden');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPwaPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.classList.add('hidden');
+  showToast('Rechnungs-LOG wurde als App installiert!');
+});
+
+async function installPwaApp() {
+  if (!deferredPwaPrompt) return;
+  deferredPwaPrompt.prompt();
+  await deferredPwaPrompt.userChoice;
+  deferredPwaPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.classList.add('hidden');
+}
 
 // ==================== INITIALIZATION & AUTH ====================
 document.addEventListener('DOMContentLoaded', async () => {
