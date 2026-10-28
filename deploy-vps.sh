@@ -107,6 +107,12 @@ echo "--> Baue und starte Docker-Container ($CONTAINER_NAME)..."
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 docker compose -p "$CONTAINER_NAME" up -d --build --remove-orphans
 
+# Falls Nginx Proxy Manager läuft, Konfiguration kurz neu laden (verhindert 502 Bad Gateway bei neuer IP)
+NPM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -iE 'proxy|npm' | head -n 1 || true)
+if [ -n "$NPM_CONTAINER" ]; then
+    docker exec "$NPM_CONTAINER" nginx -s reload 2>/dev/null || true
+fi
+
 echo "=========================================================="
 echo " ✓ Rechnungs-Verwaltung ($INSTANCE_SLUG) erfolgreich ausgerollt!"
 echo "   Ordner:                 $APP_DIR"

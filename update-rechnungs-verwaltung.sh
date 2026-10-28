@@ -84,6 +84,13 @@ update_instance() {
         # (z.B. nach Wechsel des Compose-Projektnamens) zu vermeiden. Daten in ./data bleiben erhalten!
         docker rm -f "$COMPOSE_PROJECT" 2>/dev/null || true
         docker compose -p "$COMPOSE_PROJECT" up -d --build --remove-orphans
+
+        # Falls Nginx Proxy Manager läuft, Konfiguration kurz neu laden (reload), damit
+        # OpenResty die neue Container-IP im proxy-network sofort übernimmt (verhindert 502 Bad Gateway):
+        NPM_CONTAINER=$(docker ps --format '{{.Names}}' | grep -iE 'proxy|npm' | head -n 1 || true)
+        if [ -n "$NPM_CONTAINER" ]; then
+            docker exec "$NPM_CONTAINER" nginx -s reload 2>/dev/null || true
+        fi
     fi
 
     echo "✓ Instanz $APP_DIR erfolgreich aktualisiert! Commit: $(git log -1 --format='%h - %s (%ci)')"
