@@ -56,11 +56,12 @@ db.exec(`
     number_digits INTEGER NOT NULL DEFAULT 5,
     next_sequence INTEGER NOT NULL DEFAULT 1,
     yearly_reset INTEGER NOT NULL DEFAULT 1,
-    last_reset_year INTEGER NOT NULL DEFAULT 2026
+    last_reset_year INTEGER NOT NULL DEFAULT 2026,
+    default_sort_order TEXT NOT NULL DEFAULT 'date_desc'
   );
 
-  INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year)
-  VALUES (1, '{YYYY}-', '', 5, 1, 1, CAST(strftime('%Y', 'now') AS INTEGER));
+  INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year, default_sort_order)
+  VALUES (1, '{YYYY}-', '', 5, 1, 1, CAST(strftime('%Y', 'now') AS INTEGER), 'date_desc');
 
   CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +114,13 @@ db.exec(`
     timestamp TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
   );
 `);
+
+// Safe migration for existing databases: add default_sort_order column if missing
+try {
+  db.exec("ALTER TABLE settings ADD COLUMN default_sort_order TEXT NOT NULL DEFAULT 'date_desc';");
+} catch (e) {
+  // Column already exists
+}
 
 // Ensure default user exists (admin / rechnungen2026 or via env vars)
 const existingUser = db.prepare('SELECT * FROM users WHERE id = 1').get();
@@ -302,13 +310,15 @@ app.put('/api/settings', (req, res) => {
     suffix_schema = '',
     number_digits = 5,
     next_sequence = 1,
-    yearly_reset = 1
+    yearly_reset = 1,
+    default_sort_order = 'date_desc'
   } = req.body;
 
+  const validSort = default_sort_order === 'date_asc' ? 'date_asc' : 'date_desc';
   const currentYear = new Date().getFullYear();
   db.prepare(`
     UPDATE settings
-    SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?
+    SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?
     WHERE id = 1
   `).run(
     String(prefix_schema),
@@ -316,11 +326,12 @@ app.put('/api/settings', (req, res) => {
     Number(number_digits) || 5,
     Math.max(1, Number(next_sequence) || 1),
     yearly_reset ? 1 : 0,
-    currentYear
+    currentYear,
+    validSort
   );
 
   const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  logAction('settings', 1, 'UPDATE', 'Rechnungsnummer-Schema geändert', prev, updated);
+  logAction('settings', 1, 'UPDATE', 'Einstellungen / Rechnungsnummer-Schema geändert', prev, updated);
 
   const preview = formatInvoiceNumber(updated, new Date().toISOString().slice(0, 10), updated.next_sequence);
   res.json({ ...updated, preview_next: preview });
@@ -759,9 +770,9 @@ app.post('/api/undo', (req, res) => {
     } else if (lastLog.entity_type === 'settings') {
       db.prepare(`
         UPDATE settings
-        SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?
+        SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?
         WHERE id = 1
-      `).run(prev.prefix_schema, prev.suffix_schema, prev.number_digits, prev.next_sequence, prev.yearly_reset, prev.last_reset_year);
+      `).run(prev.prefix_schema, prev.suffix_schema, prev.number_digits, prev.next_sequence, prev.yearly_reset, prev.last_reset_year, prev.default_sort_order || 'date_desc');
     }
 
     db.prepare('UPDATE audit_log SET undone = 1 WHERE id = ?').run(lastLog.id);

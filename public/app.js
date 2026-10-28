@@ -51,8 +51,8 @@ async function checkAuthAndInit() {
     document.getElementById('login-overlay').classList.add('hidden');
     const newUserField = document.getElementById('cred-new-user');
     if (newUserField) newUserField.value = data.username || 'admin';
+    await loadSettings();
     await Promise.all([
-      loadSettings(),
       loadCustomers(),
       loadAuditLogs()
     ]);
@@ -197,6 +197,13 @@ async function loadSettings() {
   document.getElementById('set-next-seq').value = appSettings.next_sequence || 1;
   document.getElementById('set-yearly-reset').checked = Boolean(appSettings.yearly_reset);
 
+  const defaultSort = appSettings.default_sort_order || 'date_desc';
+  const defaultSortEl = document.getElementById('set-default-sort');
+  if (defaultSortEl) defaultSortEl.value = defaultSort;
+
+  const custSortEl = document.getElementById('cust-invoice-sort');
+  if (custSortEl) custSortEl.value = defaultSort;
+
   updateSettingsLivePreview();
 
   const invNumberInput = document.getElementById('inv-number');
@@ -253,7 +260,8 @@ async function saveSettings(e) {
     suffix_schema: document.getElementById('set-suffix').value,
     number_digits: parseInt(document.getElementById('set-digits').value, 10) || 5,
     next_sequence: parseInt(document.getElementById('set-next-seq').value, 10) || 1,
-    yearly_reset: document.getElementById('set-yearly-reset').checked ? 1 : 0
+    yearly_reset: document.getElementById('set-yearly-reset').checked ? 1 : 0,
+    default_sort_order: document.getElementById('set-default-sort').value || 'date_desc'
   };
 
   const res = await fetch('/api/settings', {
@@ -265,8 +273,11 @@ async function saveSettings(e) {
   if (res.ok) {
     appSettings = await res.json();
     document.getElementById('inv-number').value = appSettings.preview_next;
+    const custSortEl = document.getElementById('cust-invoice-sort');
+    if (custSortEl) custSortEl.value = appSettings.default_sort_order || 'date_desc';
+    if (currentCustomer) renderCustomerInvoices();
     await loadAuditLogs();
-    showToast('Rechnungsnummern-Schema gespeichert!', 'success', true);
+    showToast('Einstellungen gespeichert!', 'success', true);
   } else {
     showToast('Fehler beim Speichern der Einstellungen', 'error');
   }

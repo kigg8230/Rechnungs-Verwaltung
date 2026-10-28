@@ -571,6 +571,17 @@
             </div>
           </div>
 
+          <!-- Default Chronological Sort Order Setting -->
+          <div class="pt-3 border-t border-slate-100">
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Standard-Sortierung der Rechnungslisten (Chronologie)</label>
+            <select id="set-default-sort"
+              class="w-full sm:w-96 px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="date_desc">Jüngster / Neuester Eintrag oben (Absteigend ↓)</option>
+              <option value="date_asc">Ältester Eintrag oben (Chronologisch aufsteigend ↑)</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Legt fest, ob in der Kundenansicht und Gesamtliste standardmäßig die neuesten oder die ältesten Einträge oben stehen.</p>
+          </div>
+
           <!-- Live Preview Box -->
           <div class="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between">
             <div>
