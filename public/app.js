@@ -160,7 +160,7 @@ function showToast(message, type = 'success', showUndo = false) {
 }
 
 // ==================== TAB NAVIGATION ====================
-function switchTab(tab) {
+async function switchTab(tab, targetCustomerId = null) {
   const tabs = ['customers', 'global', 'settings'];
   tabs.forEach(t => {
     const view = document.getElementById(`view-${t}`);
@@ -175,11 +175,11 @@ function switchTab(tab) {
   });
 
   if (tab === 'global') {
-    loadGlobalInvoices();
+    await loadGlobalInvoices();
   } else if (tab === 'settings') {
-    loadSettings();
+    await loadSettings();
   } else if (tab === 'customers') {
-    loadCustomers(currentCustomer ? currentCustomer.id : null);
+    await loadCustomers(targetCustomerId || (currentCustomer ? currentCustomer.id : null));
   }
 }
 
@@ -914,8 +914,7 @@ function renderGlobalInvoices() {
 }
 
 async function jumpToCustomer(customerId) {
-  switchTab('customers');
-  await selectCustomer(customerId);
+  await switchTab('customers', customerId);
 }
 
 function exportGlobalCsv() {
