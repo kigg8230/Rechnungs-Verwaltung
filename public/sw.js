@@ -1,12 +1,12 @@
-const CACHE_NAME = 'rechnungs-log-v2';
+const CACHE_NAME = 'rechnungs-log-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/app.js',
   '/favicon.svg',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/manifest.json'
+  '/rl-app-icon-192.png',
+  '/rl-app-icon-512.png',
+  '/manifest.json?v=3'
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,7 +31,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first strategy so live database/API data is always fresh
+// Network-first strategy so live database/API data and icons are always fresh
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 

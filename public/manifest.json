@@ -1,8 +1,9 @@
 {
+  "id": "/?app=rechnungs-log-v3",
   "name": "Rechnungs-LOG | Inkasso-Verwaltung",
   "short_name": "Rechnungs-LOG",
   "description": "Warenausgabe & Inkasso-Kontrolle mit SQLite und PDF-Ablage",
-  "start_url": "/",
+  "start_url": "/?v=3",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -10,19 +11,19 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon-192.png?v=2",
+      "src": "/rl-app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png?v=2",
+      "src": "/rl-app-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/favicon.svg?v=2",
+      "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
