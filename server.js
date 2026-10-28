@@ -60,8 +60,8 @@ db.exec(`
     default_sort_order TEXT NOT NULL DEFAULT 'date_desc'
   );
 
-  INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year, default_sort_order)
-  VALUES (1, '{YYYY}-', '', 5, 1, 1, CAST(strftime('%Y', 'now') AS INTEGER), 'date_desc');
+  INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year)
+  VALUES (1, '{YYYY}-', '', 5, 1, 1, CAST(strftime('%Y', 'now') AS INTEGER));
 
   CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
