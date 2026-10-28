@@ -104,7 +104,8 @@ docker network inspect proxy-network >/dev/null 2>&1 || docker network create pr
 
 # Docker Container bauen und im Hintergrund starten
 echo "--> Baue und starte Docker-Container ($CONTAINER_NAME)..."
-docker compose -p "$CONTAINER_NAME" up -d --build
+docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
+docker compose -p "$CONTAINER_NAME" up -d --build --remove-orphans
 
 echo "=========================================================="
 echo " ✓ Rechnungs-Verwaltung ($INSTANCE_SLUG) erfolgreich ausgerollt!"

@@ -80,7 +80,10 @@ update_instance() {
 
     if [ -f "docker-compose.yml" ]; then
         echo "--> Aktualisiere und starte Docker-Container ($COMPOSE_PROJECT) neu..."
-        docker compose -p "$COMPOSE_PROJECT" up -d --build
+        # Bestehenden Container gleichen Namens sauber stoppen/entfernen, um Namenskonflikte
+        # (z.B. nach Wechsel des Compose-Projektnamens) zu vermeiden. Daten in ./data bleiben erhalten!
+        docker rm -f "$COMPOSE_PROJECT" 2>/dev/null || true
+        docker compose -p "$COMPOSE_PROJECT" up -d --build --remove-orphans
     fi
 
     echo "✓ Instanz $APP_DIR erfolgreich aktualisiert! Commit: $(git log -1 --format='%h - %s (%ci)')"
