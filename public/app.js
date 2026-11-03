@@ -646,19 +646,19 @@ function renderCustomerInvoices() {
     let statusBtn = '';
     if (inv.is_paid) {
       statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition shadow-2xs"
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition shadow-2xs"
            title="Klicken, um auf UNBEZAHLT (Rotes X) umzuschalten">
            <span>✅</span> Bezahlt
          </button>`;
     } else if (paidAmount > 0) {
       statusBtn = `<button onclick="openPaymentsModal(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition shadow-2xs"
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition shadow-2xs"
            title="Teilzahlung erfasst - Klicken für Details">
            <span>⏳</span> Teilbezahlt
          </button>`;
     } else {
       statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition shadow-2xs"
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition shadow-2xs"
            title="Klicken, um auf BEZAHLT (Grüner Haken) umzuschalten">
            <span>❌</span> Offen
          </button>`;
@@ -700,7 +700,11 @@ function renderCustomerInvoices() {
         </td>
         <td class="py-2.5 px-2 text-center whitespace-nowrap">${pdfLink}</td>
         <td class="py-2.5 px-3 text-xs text-right whitespace-nowrap">${amountCell}</td>
-        <td class="py-2.5 px-3 text-center whitespace-nowrap">${statusBtn}</td>
+        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+          <div class="inline-flex items-center justify-end">
+            ${statusBtn}
+          </div>
+        </td>
         <td class="py-2.5 px-3 text-right whitespace-nowrap">
           <button onclick="openPaymentsModal(${inv.id})"
             class="text-emerald-700 hover:text-emerald-900 px-1 py-0.5 rounded text-xs font-bold" title="Teilzahlung erfassen / verwalten">💰</button>
@@ -1056,18 +1060,18 @@ function renderGlobalInvoices() {
     let statusBtn = '';
     if (inv.is_paid) {
       statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition">
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition">
            <span>✅</span> Bezahlt
          </button>`;
     } else if (paidAmount > 0) {
       statusBtn = `<button onclick="openPaymentsModal(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition"
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition"
            title="Teilzahlung erfasst - Klicken für Details">
            <span>⏳</span> Teilbezahlt
          </button>`;
     } else {
       statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
-           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition">
+           class="w-28 shrink-0 inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition">
            <span>❌</span> Offen
          </button>`;
     }
@@ -1109,10 +1113,10 @@ function renderGlobalInvoices() {
         </td>
         <td class="py-2.5 px-2 text-center whitespace-nowrap">${pdfCell}</td>
         <td class="py-2.5 px-3 text-xs text-right whitespace-nowrap">${amountCell}</td>
-        <td class="py-2.5 px-3 text-center whitespace-nowrap">
-          <div class="flex items-center justify-center gap-1">
+        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+          <div class="inline-flex items-center justify-end gap-1.5">
             ${statusBtn}
-            <button onclick="openPaymentsModal(${inv.id})" class="text-xs text-slate-400 hover:text-emerald-700" title="Teilzahlungen verwalten">💰</button>
+            <button onclick="openPaymentsModal(${inv.id})" class="text-xs text-slate-400 hover:text-emerald-700 p-0.5" title="Teilzahlungen verwalten">💰</button>
           </div>
         </td>
       </tr>
