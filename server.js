@@ -92,6 +92,16 @@ db.exec(`
     FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS invoice_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    payment_date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS customer_documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id INTEGER NOT NULL,
@@ -121,6 +131,19 @@ try {
 } catch (e) {
   // Column already exists
 }
+
+// Migration: invoice_payments table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS invoice_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    payment_date TEXT NOT NULL,
+    amount REAL NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+  );
+`);
 
 // Ensure default user exists (admin / rechnungen2026 or via env vars)
 const existingUser = db.prepare('SELECT * FROM users WHERE id = 1').get();
@@ -248,7 +271,32 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
 });
 
-// Helper: Format invoice number from settings + date + sequence
+// Helper: Recompute invoice paid status based on payments
+function updateInvoicePaidStatusFromPayments(invoiceId) {
+  const inv = db.prepare('SELECT amount, is_paid, paid_at FROM invoices WHERE id = ?').get(invoiceId);
+  if (!inv) return null;
+  const paySumRow = db.prepare('SELECT COALESCE(SUM(amount), 0) AS total_paid FROM invoice_payments WHERE invoice_id = ?').get(invoiceId);
+  const totalPaid = Math.round((paySumRow.total_paid || 0) * 100) / 100;
+  const invAmount = Math.round((inv.amount || 0) * 100) / 100;
+
+  let newIsPaid = inv.is_paid;
+  let newPaidAt = inv.paid_at;
+
+  if (totalPaid >= invAmount && invAmount > 0) {
+    newIsPaid = 1;
+    if (!newPaidAt) newPaidAt = new Date().toISOString();
+  } else if (inv.is_paid === 1 && totalPaid < invAmount) {
+    // If payments exist but do not cover total amount, it's partially paid (unpaid status)
+    newIsPaid = 0;
+    newPaidAt = null;
+  }
+
+  if (newIsPaid !== inv.is_paid || newPaidAt !== inv.paid_at) {
+    db.prepare('UPDATE invoices SET is_paid = ?, paid_at = ? WHERE id = ?').run(newIsPaid, newPaidAt, invoiceId);
+  }
+
+  return { ...inv, is_paid: newIsPaid, paid_at: newPaidAt, total_paid: totalPaid, remaining: Math.max(0, Math.round((invAmount - totalPaid) * 100) / 100) };
+}
 function formatInvoiceNumber(settings, dateStr, sequenceNum) {
   const dateObj = dateStr ? new Date(dateStr) : new Date();
   const yyyy = String(dateObj.getFullYear());
@@ -344,10 +392,15 @@ app.get('/api/customers', (req, res) => {
     SELECT c.*,
       COUNT(i.id) AS invoice_count,
       SUM(CASE WHEN i.is_paid = 0 THEN 1 ELSE 0 END) AS unpaid_count,
-      COALESCE(SUM(CASE WHEN i.is_paid = 0 THEN i.amount ELSE 0 END), 0) AS unpaid_amount,
+      COALESCE(SUM(CASE WHEN i.is_paid = 0 THEN (i.amount - COALESCE(p.paid_sum, 0)) ELSE 0 END), 0) AS unpaid_amount,
       COALESCE(SUM(i.amount), 0) AS total_amount
     FROM customers c
     LEFT JOIN invoices i ON i.customer_id = c.id
+    LEFT JOIN (
+      SELECT invoice_id, SUM(amount) AS paid_sum
+      FROM invoice_payments
+      GROUP BY invoice_id
+    ) p ON p.invoice_id = i.id
     GROUP BY c.id
     ORDER BY c.last_name COLLATE NOCASE ASC, c.first_name COLLATE NOCASE ASC
   `).all();
@@ -359,7 +412,38 @@ app.get('/api/customers/:id', (req, res) => {
   if (!customer) return res.status(404).json({ error: 'Kunde nicht gefunden' });
 
   const documents = db.prepare('SELECT * FROM customer_documents WHERE customer_id = ? ORDER BY uploaded_at DESC').all(customer.id);
-  const invoices = db.prepare('SELECT * FROM invoices WHERE customer_id = ? ORDER BY invoice_date DESC, id DESC').all(customer.id);
+  const invoices = db.prepare(`
+    SELECT i.*,
+      COALESCE(p.paid_sum, 0) AS paid_amount,
+      ROUND(MAX(0, i.amount - COALESCE(p.paid_sum, 0)), 2) AS remaining_amount,
+      COALESCE(p.payment_count, 0) AS payment_count
+    FROM invoices i
+    LEFT JOIN (
+      SELECT invoice_id, SUM(amount) AS paid_sum, COUNT(id) AS payment_count
+      FROM invoice_payments
+      GROUP BY invoice_id
+    ) p ON p.invoice_id = i.id
+    WHERE i.customer_id = ?
+    ORDER BY i.invoice_date DESC, i.id DESC
+  `).all(customer.id);
+
+  // Attach payments array to each invoice
+  const payments = db.prepare(`
+    SELECT ip.* FROM invoice_payments ip
+    JOIN invoices i ON i.id = ip.invoice_id
+    WHERE i.customer_id = ?
+    ORDER BY ip.payment_date ASC, ip.id ASC
+  `).all(customer.id);
+
+  const paymentsByInvoice = {};
+  for (const pm of payments) {
+    if (!paymentsByInvoice[pm.invoice_id]) paymentsByInvoice[pm.invoice_id] = [];
+    paymentsByInvoice[pm.invoice_id].push(pm);
+  }
+
+  for (const inv of invoices) {
+    inv.payments = paymentsByInvoice[inv.id] || [];
+  }
 
   res.json({ ...customer, documents, invoices });
 });
@@ -526,12 +610,41 @@ app.get('/api/invoices', (req, res) => {
   else if (sort === 'amount_asc') orderSql = 'ORDER BY i.amount ASC';
 
   const invoices = db.prepare(`
-    SELECT i.*, c.first_name, c.last_name, c.city, c.street, c.zip_code
+    SELECT i.*,
+      c.first_name, c.last_name, c.city, c.street, c.zip_code,
+      COALESCE(p.paid_sum, 0) AS paid_amount,
+      ROUND(MAX(0, i.amount - COALESCE(p.paid_sum, 0)), 2) AS remaining_amount,
+      COALESCE(p.payment_count, 0) AS payment_count
     FROM invoices i
     JOIN customers c ON c.id = i.customer_id
+    LEFT JOIN (
+      SELECT invoice_id, SUM(amount) AS paid_sum, COUNT(id) AS payment_count
+      FROM invoice_payments
+      GROUP BY invoice_id
+    ) p ON p.invoice_id = i.id
     ${whereSql}
     ${orderSql}
   `).all(...params);
+
+  // If fetching for all invoices, also attach payments
+  if (invoices.length > 0) {
+    const invIds = invoices.map(x => x.id);
+    const placeholders = invIds.map(() => '?').join(',');
+    const allPayments = db.prepare(`
+      SELECT * FROM invoice_payments
+      WHERE invoice_id IN (${placeholders})
+      ORDER BY payment_date ASC, id ASC
+    `).all(...invIds);
+
+    const payMap = {};
+    for (const p of allPayments) {
+      if (!payMap[p.invoice_id]) payMap[p.invoice_id] = [];
+      payMap[p.invoice_id].push(p);
+    }
+    for (const inv of invoices) {
+      inv.payments = payMap[inv.id] || [];
+    }
+  }
 
   res.json(invoices);
 });
@@ -673,9 +786,85 @@ app.delete('/api/invoices/:id', (req, res) => {
   const prev = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
   if (!prev) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
 
+  const payments = db.prepare('SELECT * FROM invoice_payments WHERE invoice_id = ?').all(id);
+
   db.prepare('DELETE FROM invoices WHERE id = ?').run(id);
-  logAction('invoices', id, 'DELETE', `Rechnung ${prev.invoice_number} (${prev.amount.toFixed(2)} €) gelöscht`, prev, null);
+  logAction('invoices', id, 'DELETE', `Rechnung ${prev.invoice_number} (${prev.amount.toFixed(2)} €) gelöscht`, { ...prev, payments }, null);
   res.json({ success: true });
+});
+
+// ==================== INVOICE PAYMENTS (PARTIAL PAYMENTS) API ====================
+
+app.get('/api/invoices/:id/payments', (req, res) => {
+  const invoiceId = Number(req.params.id);
+  const payments = db.prepare('SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date ASC, id ASC').all(invoiceId);
+  res.json(payments);
+});
+
+app.post('/api/invoices/:id/payments', (req, res) => {
+  const invoiceId = Number(req.params.id);
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+  if (!invoice) return res.status(404).json({ error: 'Rechnung nicht gefunden' });
+
+  const paymentDate = (req.body.payment_date || new Date().toISOString().slice(0, 10)).trim();
+  const rawAmount = String(req.body.amount || '0').replace(',', '.');
+  const amount = parseFloat(rawAmount) || 0;
+  const note = (req.body.note || '').trim();
+
+  if (amount <= 0) {
+    return res.status(400).json({ error: 'Der Zahlungsbetrag muss größer als 0 sein.' });
+  }
+
+  const prevInvoiceState = { ...invoice };
+  const prevPayments = db.prepare('SELECT * FROM invoice_payments WHERE invoice_id = ?').all(invoiceId);
+
+  const info = db.prepare(`
+    INSERT INTO invoice_payments (invoice_id, payment_date, amount, note)
+    VALUES (?, ?, ?, ?)
+  `).run(invoiceId, paymentDate, amount, note);
+
+  const payment = db.prepare('SELECT * FROM invoice_payments WHERE id = ?').get(Number(info.lastInsertRowid));
+
+  // Recalculate invoice paid status
+  const updatedInv = updateInvoicePaidStatusFromPayments(invoiceId);
+
+  logAction(
+    'invoice_payments',
+    payment.id,
+    'CREATE',
+    `Teilzahlung von ${payment.amount.toFixed(2)} € für Rechnung ${invoice.invoice_number} erfasst`,
+    { invoice: prevInvoiceState, payments: prevPayments },
+    { payment, updatedInvoice: updatedInv }
+  );
+
+  res.status(201).json({ payment, invoice: updatedInv });
+});
+
+app.delete('/api/payments/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const payment = db.prepare('SELECT * FROM invoice_payments WHERE id = ?').get(id);
+  if (!payment) return res.status(404).json({ error: 'Zahlungseintrag nicht gefunden' });
+
+  const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(payment.invoice_id);
+  const prevInvoiceState = invoice ? { ...invoice } : null;
+
+  db.prepare('DELETE FROM invoice_payments WHERE id = ?').run(id);
+
+  let updatedInv = null;
+  if (invoice) {
+    updatedInv = updateInvoicePaidStatusFromPayments(invoice.id);
+  }
+
+  logAction(
+    'invoice_payments',
+    id,
+    'DELETE',
+    `Teilzahlung von ${payment.amount.toFixed(2)} € gelöscht`,
+    { payment, invoice: prevInvoiceState },
+    { updatedInvoice: updatedInv }
+  );
+
+  res.json({ success: true, updatedInvoice: updatedInv });
 });
 
 // ==================== AUDIT LOG & UNDO API ====================
@@ -757,6 +946,19 @@ app.post('/api/undo', (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?)
           `).run(doc.id, doc.customer_id, doc.file_name, doc.original_name, doc.description, doc.uploaded_at);
         }
+      }
+    } else if (lastLog.entity_type === 'invoice_payments') {
+      if (lastLog.action === 'CREATE') {
+        const pm = db.prepare('SELECT invoice_id FROM invoice_payments WHERE id = ?').get(lastLog.entity_id);
+        db.prepare('DELETE FROM invoice_payments WHERE id = ?').run(lastLog.entity_id);
+        if (pm) updateInvoicePaidStatusFromPayments(pm.invoice_id);
+      } else if (lastLog.action === 'DELETE') {
+        const p = prev.payment;
+        db.prepare(`
+          INSERT INTO invoice_payments (id, invoice_id, payment_date, amount, note, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(p.id, p.invoice_id, p.payment_date, p.amount, p.note, p.created_at);
+        updateInvoicePaidStatusFromPayments(p.invoice_id);
       }
     } else if (lastLog.entity_type === 'customer_documents') {
       if (lastLog.action === 'CREATE') {

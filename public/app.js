@@ -7,6 +7,7 @@ let globalInvoices = [];
 let appSettings = null;
 let auditLogs = [];
 let deferredPwaPrompt = null;
+let currentPaymentsInvoice = null;
 
 // ==================== PWA SERVICE WORKER & INSTALL PROMPT ====================
 if ('serviceWorker' in navigator) {
@@ -630,21 +631,38 @@ function renderCustomerInvoices() {
 
   tbody.innerHTML = list.map(inv => {
     const amt = Number(inv.amount) || 0;
-    totalSum += amt;
-    if (inv.is_paid) paidSum += amt;
-    else unpaidSum += amt;
+    const paidAmount = Number(inv.paid_amount || 0);
+    const remainingAmount = inv.remaining_amount !== undefined ? Number(inv.remaining_amount) : Math.max(0, amt - paidAmount);
+    const payments = inv.payments || [];
 
-    const statusBtn = inv.is_paid
-      ? `<button onclick="toggleInvoicePaid(${inv.id})"
+    totalSum += amt;
+    if (inv.is_paid) {
+      paidSum += amt;
+    } else {
+      paidSum += paidAmount;
+      unpaidSum += remainingAmount;
+    }
+
+    let statusBtn = '';
+    if (inv.is_paid) {
+      statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition shadow-2xs"
            title="Klicken, um auf UNBEZAHLT (Rotes X) umzuschalten">
            <span>✅</span> Bezahlt
-         </button>`
-      : `<button onclick="toggleInvoicePaid(${inv.id})"
+         </button>`;
+    } else if (paidAmount > 0) {
+      statusBtn = `<button onclick="openPaymentsModal(${inv.id})"
+           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition shadow-2xs"
+           title="Teilzahlung erfasst - Klicken für Details">
+           <span>⏳</span> Teilbezahlt
+         </button>`;
+    } else {
+      statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition shadow-2xs"
            title="Klicken, um auf BEZAHLT (Grüner Haken) umzuschalten">
            <span>❌</span> Offen
          </button>`;
+    }
 
     const pdfLink = inv.pdf_filename
       ? `<a href="/uploads/${encodeURIComponent(inv.pdf_filename)}" target="_blank"
@@ -654,15 +672,38 @@ function renderCustomerInvoices() {
          </a>`
       : `<span class="text-xs text-slate-300">—</span>`;
 
+    // Amount cell with partial payment details
+    let amountCell = `<div class="font-bold whitespace-nowrap ${inv.is_paid ? 'text-slate-800' : (paidAmount > 0 ? 'text-amber-700' : 'text-rose-700')}">${formatCurrency(amt)}</div>`;
+    if (paidAmount > 0 && !inv.is_paid) {
+      amountCell += `<div class="text-[10px] text-slate-500 font-normal">Bezahlt: <span class="text-emerald-700 font-semibold">${formatCurrency(paidAmount)}</span></div>`;
+      amountCell += `<div class="text-[10px] text-rose-600 font-semibold">Rest: ${formatCurrency(remainingAmount)}</div>`;
+    }
+
+    const isPartial = paidAmount > 0 && !inv.is_paid;
+    const rowBg = inv.is_paid ? '' : (isPartial ? 'bg-amber-50/25' : 'bg-rose-50/20');
+
     return `
-      <tr class="hover:bg-slate-50/80 transition ${inv.is_paid ? '' : 'bg-rose-50/20'}">
+      <tr class="hover:bg-slate-50/80 transition ${rowBg}">
         <td class="py-2.5 px-3 text-xs font-medium text-slate-600 whitespace-nowrap">${formatDateDE(inv.invoice_date)}</td>
         <td class="py-2.5 px-3 text-xs font-mono font-bold text-slate-900 whitespace-nowrap">${escapeHtml(inv.invoice_number)}</td>
-        <td class="py-2.5 px-4 text-sm text-slate-800 w-full break-words">${escapeHtml(inv.description) || '<span class="text-slate-300 italic">Kein Text</span>'}</td>
+        <td class="py-2.5 px-4 text-sm text-slate-800 w-full break-words">
+          <div>${escapeHtml(inv.description) || '<span class="text-slate-300 italic">Kein Text</span>'}</div>
+          ${payments.length > 0 ? `
+            <div class="mt-1 flex flex-wrap gap-1">
+              ${payments.map(p => `
+                <span class="inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                  <span>💰</span> ${formatDateDE(p.payment_date)}: <b>${formatCurrency(p.amount)}</b> ${p.note ? `(${escapeHtml(p.note)})` : ''}
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+        </td>
         <td class="py-2.5 px-2 text-center whitespace-nowrap">${pdfLink}</td>
-        <td class="py-2.5 px-3 text-xs text-right font-bold whitespace-nowrap ${inv.is_paid ? 'text-slate-800' : 'text-rose-700'}">${formatCurrency(amt)}</td>
+        <td class="py-2.5 px-3 text-xs text-right whitespace-nowrap">${amountCell}</td>
         <td class="py-2.5 px-3 text-center whitespace-nowrap">${statusBtn}</td>
         <td class="py-2.5 px-3 text-right whitespace-nowrap">
+          <button onclick="openPaymentsModal(${inv.id})"
+            class="text-emerald-700 hover:text-emerald-900 px-1 py-0.5 rounded text-xs font-bold" title="Teilzahlung erfassen / verwalten">💰</button>
           <button onclick='openInvoiceModal(${JSON.stringify(inv).replace(/'/g, "&#39;")})'
             class="text-slate-400 hover:text-blue-600 px-1 py-0.5 rounded" title="Eintrag bearbeiten">✏️</button>
           <button onclick="deleteInvoice(${inv.id})"
@@ -676,8 +717,8 @@ function renderCustomerInvoices() {
     <tr>
       <td colspan="4" class="py-2.5 px-3 text-xs text-slate-600">
         Summe (${list.length} ${list.length === 1 ? 'Rechnung' : 'Rechnungen'}) •
-        <span class="text-emerald-700">✅ Bezahlt: ${formatCurrency(paidSum)}</span> •
-        <span class="text-rose-700">❌ Offen: ${formatCurrency(unpaidSum)}</span>
+        <span class="text-emerald-700 font-semibold">✅ Bezahlt: ${formatCurrency(paidSum)}</span> •
+        <span class="text-rose-700 font-semibold">❌ Noch offen: ${formatCurrency(unpaidSum)}</span>
       </td>
       <td class="py-2.5 px-3 text-xs text-right text-slate-900 font-bold whitespace-nowrap">${formatCurrency(totalSum)}</td>
       <td colspan="2"></td>
@@ -796,6 +837,129 @@ async function deleteInvoice(id) {
   }
 }
 
+// ==================== PARTIAL PAYMENTS (TEILZAHLUNGEN) ====================
+async function openPaymentsModal(invoiceId) {
+  // Find invoice from currentCustomer or globalInvoices
+  let invoice = null;
+  if (currentCustomer && currentCustomer.invoices) {
+    invoice = currentCustomer.invoices.find(i => i.id === invoiceId);
+  }
+  if (!invoice && globalInvoices) {
+    invoice = globalInvoices.find(i => i.id === invoiceId);
+  }
+  if (!invoice) {
+    const res = await fetch(`/api/invoices?search=${invoiceId}`);
+    const list = await res.json();
+    invoice = list.find(i => i.id === invoiceId);
+  }
+  if (!invoice) return;
+
+  currentPaymentsInvoice = invoice;
+
+  document.getElementById('pm-modal-title').textContent = `Teilzahlungen für Rechn.-Nr. ${invoice.invoice_number}`;
+  document.getElementById('pm-new-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('pm-new-note').value = '';
+
+  await refreshPaymentsModalData();
+  document.getElementById('payments-modal').classList.remove('hidden');
+}
+
+function closePaymentsModal() {
+  document.getElementById('payments-modal').classList.add('hidden');
+  currentPaymentsInvoice = null;
+}
+
+async function refreshPaymentsModalData() {
+  if (!currentPaymentsInvoice) return;
+  const invId = currentPaymentsInvoice.id;
+
+  const res = await fetch(`/api/invoices/${invId}/payments`);
+  const payments = await res.json();
+
+  let totalPaid = 0;
+  payments.forEach(p => totalPaid += Number(p.amount) || 0);
+
+  const invAmount = Number(currentPaymentsInvoice.amount) || 0;
+  const remaining = Math.max(0, Math.round((invAmount - totalPaid) * 100) / 100);
+
+  document.getElementById('pm-total-amount').textContent = formatCurrency(invAmount);
+  document.getElementById('pm-paid-amount').textContent = formatCurrency(totalPaid);
+  document.getElementById('pm-remaining-amount').textContent = formatCurrency(remaining);
+
+  // Set default suggested amount to remaining
+  document.getElementById('pm-new-amount').value = remaining > 0 ? remaining.toFixed(2) : '';
+
+  const listEl = document.getElementById('pm-history-list');
+  if (payments.length === 0) {
+    listEl.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">Noch keine Teilzahlungen erfasst.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = payments.map(p => `
+    <div class="p-3 bg-white hover:bg-slate-50 flex items-center justify-between gap-3 text-xs">
+      <div>
+        <div class="font-bold text-slate-800 flex items-center gap-2">
+          <span>📅 ${formatDateDE(p.payment_date)}</span>
+          <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            ${formatCurrency(p.amount)}
+          </span>
+        </div>
+        ${p.note ? `<div class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(p.note)}</div>` : ''}
+      </div>
+      <button onclick="deletePayment(${p.id})"
+        class="text-slate-400 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 transition" title="Zahlung löschen">
+        🗑️
+      </button>
+    </div>
+  `).join('');
+}
+
+async function submitAddPayment(e) {
+  e.preventDefault();
+  if (!currentPaymentsInvoice) return;
+
+  const invId = currentPaymentsInvoice.id;
+  const payment_date = document.getElementById('pm-new-date').value;
+  const amount = document.getElementById('pm-new-amount').value;
+  const note = document.getElementById('pm-new-note').value;
+
+  const res = await fetch(`/api/invoices/${invId}/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payment_date, amount, note })
+  });
+
+  if (res.ok) {
+    const data = await res.json();
+    document.getElementById('pm-new-note').value = '';
+    await refreshPaymentsModalData();
+    if (currentCustomer) await loadCustomers(currentCustomer.id);
+    if (!document.getElementById('view-global').classList.contains('hidden')) await loadGlobalInvoices();
+    await loadAuditLogs();
+
+    const isFullyPaid = data.invoice && data.invoice.is_paid;
+    showToast(isFullyPaid ? 'Zahlung gebucht: Rechnung jetzt VOLL BEZAHLT ✅' : 'Teilzahlung gebucht!', 'success', true);
+  } else {
+    const err = await res.json();
+    showToast(err.error || 'Fehler beim Erfassen der Zahlung', 'error');
+  }
+}
+
+async function deletePayment(paymentId) {
+  if (!confirm('Diesen Zahlungseintrag wirklich löschen?')) return;
+
+  const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+  if (res.ok) {
+    await refreshPaymentsModalData();
+    if (currentCustomer) await loadCustomers(currentCustomer.id);
+    if (!document.getElementById('view-global').classList.contains('hidden')) await loadGlobalInvoices();
+    await loadAuditLogs();
+    showToast('Zahlungseintrag gelöscht.', 'success', true);
+  } else {
+    showToast('Fehler beim Löschen der Zahlung', 'error');
+  }
+}
+
 // ==================== GLOBAL INVOICE LIST (PERIOD & SORTED BY INVOICE NUMBER) ====================
 function setGlobalPeriod(preset) {
   const fromEl = document.getElementById('global-from');
@@ -851,12 +1015,16 @@ function renderGlobalInvoices() {
 
   globalInvoices.forEach(i => {
     const a = Number(i.amount) || 0;
+    const pAmt = Number(i.paid_amount || 0);
+    const rem = i.remaining_amount !== undefined ? Number(i.remaining_amount) : Math.max(0, a - pAmt);
+
     totalAmt += a;
     if (i.is_paid) {
       paidAmt += a;
       paidCount++;
     } else {
-      unpaidAmt += a;
+      paidAmt += pAmt;
+      unpaidAmt += rem;
       unpaidCount++;
     }
   });
@@ -864,9 +1032,9 @@ function renderGlobalInvoices() {
   document.getElementById('global-sum-total').textContent = formatCurrency(totalAmt);
   document.getElementById('global-count-total').textContent = `${globalInvoices.length} Rechnungen`;
   document.getElementById('global-sum-paid').textContent = formatCurrency(paidAmt);
-  document.getElementById('global-count-paid').textContent = `${paidCount} bezahlt`;
+  document.getElementById('global-count-paid').textContent = `${paidCount} voll bezahlt`;
   document.getElementById('global-sum-unpaid').textContent = formatCurrency(unpaidAmt);
-  document.getElementById('global-count-unpaid').textContent = `${unpaidCount} offen`;
+  document.getElementById('global-count-unpaid').textContent = `${unpaidCount} offen / Teilzahlung`;
 
   if (globalInvoices.length === 0) {
     tbody.innerHTML = `
@@ -880,22 +1048,45 @@ function renderGlobalInvoices() {
   }
 
   tbody.innerHTML = globalInvoices.map(inv => {
-    const statusBtn = inv.is_paid
-      ? `<button onclick="toggleInvoicePaid(${inv.id})"
+    const amt = Number(inv.amount) || 0;
+    const paidAmount = Number(inv.paid_amount || 0);
+    const remainingAmount = inv.remaining_amount !== undefined ? Number(inv.remaining_amount) : Math.max(0, amt - paidAmount);
+    const payments = inv.payments || [];
+
+    let statusBtn = '';
+    if (inv.is_paid) {
+      statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition">
            <span>✅</span> Bezahlt
-         </button>`
-      : `<button onclick="toggleInvoicePaid(${inv.id})"
+         </button>`;
+    } else if (paidAmount > 0) {
+      statusBtn = `<button onclick="openPaymentsModal(${inv.id})"
+           class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300 transition"
+           title="Teilzahlung erfasst - Klicken für Details">
+           <span>⏳</span> Teilbezahlt
+         </button>`;
+    } else {
+      statusBtn = `<button onclick="toggleInvoicePaid(${inv.id})"
            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 hover:bg-rose-200 border border-rose-300 transition">
            <span>❌</span> Offen
          </button>`;
+    }
 
     const pdfCell = inv.pdf_filename
       ? `<a href="/uploads/${encodeURIComponent(inv.pdf_filename)}" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline">📄 PDF</a>`
       : `<span class="text-slate-300 text-xs">—</span>`;
 
+    let amountCell = `<div class="font-bold whitespace-nowrap ${inv.is_paid ? 'text-slate-800' : (paidAmount > 0 ? 'text-amber-700' : 'text-rose-700')}">${formatCurrency(amt)}</div>`;
+    if (paidAmount > 0 && !inv.is_paid) {
+      amountCell += `<div class="text-[10px] text-slate-500 font-normal">Bezahlt: <span class="text-emerald-700 font-semibold">${formatCurrency(paidAmount)}</span></div>`;
+      amountCell += `<div class="text-[10px] text-rose-600 font-semibold">Rest: ${formatCurrency(remainingAmount)}</div>`;
+    }
+
+    const isPartial = paidAmount > 0 && !inv.is_paid;
+    const rowBg = inv.is_paid ? '' : (isPartial ? 'bg-amber-50/25' : 'bg-rose-50/20');
+
     return `
-      <tr class="hover:bg-slate-50 transition ${inv.is_paid ? '' : 'bg-rose-50/20'}">
+      <tr class="hover:bg-slate-50 transition ${rowBg}">
         <td class="py-2.5 px-3 text-xs font-mono font-bold text-slate-900 whitespace-nowrap">${escapeHtml(inv.invoice_number)}</td>
         <td class="py-2.5 px-3 text-xs text-slate-600 whitespace-nowrap">${formatDateDE(inv.invoice_date)}</td>
         <td class="py-2.5 px-3 whitespace-nowrap">
@@ -904,10 +1095,26 @@ function renderGlobalInvoices() {
           </button>
           <div class="text-[11px] text-slate-400">${escapeHtml(inv.zip_code)} ${escapeHtml(inv.city)}</div>
         </td>
-        <td class="py-2.5 px-4 text-sm text-slate-800 w-full break-words">${escapeHtml(inv.description) || '—'}</td>
+        <td class="py-2.5 px-4 text-sm text-slate-800 w-full break-words">
+          <div>${escapeHtml(inv.description) || '—'}</div>
+          ${payments.length > 0 ? `
+            <div class="mt-1 flex flex-wrap gap-1">
+              ${payments.map(p => `
+                <span class="inline-flex items-center gap-1 text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                  <span>💰</span> ${formatDateDE(p.payment_date)}: <b>${formatCurrency(p.amount)}</b> ${p.note ? `(${escapeHtml(p.note)})` : ''}
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
+        </td>
         <td class="py-2.5 px-2 text-center whitespace-nowrap">${pdfCell}</td>
-        <td class="py-2.5 px-3 text-xs text-right font-bold whitespace-nowrap ${inv.is_paid ? 'text-slate-800' : 'text-rose-700'}">${formatCurrency(inv.amount)}</td>
-        <td class="py-2.5 px-3 text-center whitespace-nowrap">${statusBtn}</td>
+        <td class="py-2.5 px-3 text-xs text-right whitespace-nowrap">${amountCell}</td>
+        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1">
+            ${statusBtn}
+            <button onclick="openPaymentsModal(${inv.id})" class="text-xs text-slate-400 hover:text-emerald-700" title="Teilzahlungen verwalten">💰</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
