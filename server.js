@@ -997,9 +997,10 @@ app.post('/api/cosmoterra/invoices', async (req, res) => {
     const targetDir = path.join(UPLOADS_DIR, ymFolder);
     fs.mkdirSync(targetDir, { recursive: true });
 
+    const safeGpNr = sanitizeFilenameSegment(settings.cosmoterra_partner_gp_nr || '');
     const safeInv = sanitizeFilenameSegment(invoiceNumber) || 'Rechnung';
     const safeCust = sanitizeFilenameSegment(customerDisplayName) || `Kunde_${customer.id}`;
-    const baseName = `${safeInv}_${safeCust}`;
+    const baseName = safeGpNr ? `${safeGpNr}-${safeInv}_${safeCust}` : `${safeInv}_${safeCust}`;
 
     let finalFileName = `${baseName}.pdf`;
     let counter = 2;
