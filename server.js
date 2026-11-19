@@ -67,7 +67,8 @@ db.exec(`
     cosmoterra_partner_name TEXT NOT NULL DEFAULT '',
     cosmoterra_partner_address TEXT NOT NULL DEFAULT '',
     cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '',
-    cosmoterra_partner_image TEXT NOT NULL DEFAULT ''
+    cosmoterra_partner_image TEXT NOT NULL DEFAULT '',
+    cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}'
   );
 
   INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year)
@@ -143,7 +144,8 @@ const safeSettingsAlterStatements = [
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_name TEXT NOT NULL DEFAULT '';",
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_address TEXT NOT NULL DEFAULT '';",
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '';",
-  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_image TEXT NOT NULL DEFAULT '';"
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_image TEXT NOT NULL DEFAULT '';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}';"
 ];
 for (const sql of safeSettingsAlterStatements) {
   try {
@@ -554,12 +556,18 @@ app.put('/api/settings', (req, res) => {
   const cosmoterra_partner_name = body.cosmoterra_partner_name !== undefined ? String(body.cosmoterra_partner_name).trim() : (prev.cosmoterra_partner_name || '');
   const cosmoterra_partner_address = body.cosmoterra_partner_address !== undefined ? String(body.cosmoterra_partner_address).trim() : (prev.cosmoterra_partner_address || '');
   const cosmoterra_partner_gp_nr = body.cosmoterra_partner_gp_nr !== undefined ? String(body.cosmoterra_partner_gp_nr).trim() : (prev.cosmoterra_partner_gp_nr || '');
+  const defaultGiftText = 'Geschenk von Herzen von deinem Berater {NAME}';
+  const rawGiftText = body.cosmoterra_gift_text !== undefined
+    ? String(body.cosmoterra_gift_text).trim()
+    : (prev.cosmoterra_gift_text !== undefined ? String(prev.cosmoterra_gift_text).trim() : defaultGiftText);
+  const cosmoterra_gift_text = rawGiftText || defaultGiftText;
 
   const currentYear = new Date().getFullYear();
   db.prepare(`
     UPDATE settings
     SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
-        cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?
+        cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?,
+        cosmoterra_gift_text = ?
     WHERE id = 1
   `).run(
     prefix_schema,
@@ -573,7 +581,8 @@ app.put('/api/settings', (req, res) => {
     cosmoterra_partner_mode,
     cosmoterra_partner_name,
     cosmoterra_partner_address,
-    cosmoterra_partner_gp_nr
+    cosmoterra_partner_gp_nr,
+    cosmoterra_gift_text
   );
 
   const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
@@ -1294,7 +1303,8 @@ app.post('/api/undo', (req, res) => {
       db.prepare(`
         UPDATE settings
         SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
-            cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?, cosmoterra_partner_image = ?
+            cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?, cosmoterra_partner_image = ?,
+            cosmoterra_gift_text = ?
         WHERE id = 1
       `).run(
         prev.prefix_schema,
@@ -1309,7 +1319,8 @@ app.post('/api/undo', (req, res) => {
         prev.cosmoterra_partner_name || '',
         prev.cosmoterra_partner_address || '',
         prev.cosmoterra_partner_gp_nr || '',
-        prev.cosmoterra_partner_image || ''
+        prev.cosmoterra_partner_image || '',
+        prev.cosmoterra_gift_text || 'Geschenk von Herzen von deinem Berater {NAME}'
       );
     }
 

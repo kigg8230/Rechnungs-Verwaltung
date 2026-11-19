@@ -47,6 +47,14 @@ function ctEscapeAttr(str) {
   return escapeHtml(str).replace(/'/g, '&#39;');
 }
 
+const DEFAULT_COSMOTERRA_GIFT_TEXT = 'Geschenk von Herzen von deinem Berater {NAME}';
+
+function resolveCosmoterraGiftText(settings) {
+  const tpl = (settings && settings.cosmoterra_gift_text ? String(settings.cosmoterra_gift_text).trim() : '') || DEFAULT_COSMOTERRA_GIFT_TEXT;
+  const partnerName = settings && settings.cosmoterra_partner_name ? String(settings.cosmoterra_partner_name).trim() : '';
+  return tpl.replace(/\{NAME\}/gi, partnerName).replace(/\s+/g, ' ').trim();
+}
+
 // ==================== SETTINGS SYNC & PARTNER CONFIG ====================
 function syncCosmoterraUI() {
   const enabled = Boolean(appSettings && appSettings.cosmoterra_enabled);
@@ -68,6 +76,10 @@ function syncCosmoterraUI() {
     document.getElementById('ct-set-partner-name').value = appSettings.cosmoterra_partner_name || '';
     document.getElementById('ct-set-partner-address').value = appSettings.cosmoterra_partner_address || '';
     document.getElementById('ct-set-partner-gp-nr').value = appSettings.cosmoterra_partner_gp_nr || '';
+    const giftTextEl = document.getElementById('ct-set-gift-text');
+    if (giftTextEl) {
+      giftTextEl.value = (appSettings.cosmoterra_gift_text || '').trim() || DEFAULT_COSMOTERRA_GIFT_TEXT;
+    }
 
     const mode = appSettings.cosmoterra_partner_mode === 'image' ? 'image' : 'text';
     const radios = document.querySelectorAll('input[name="ct-set-partner-mode"]');
@@ -107,12 +119,14 @@ function toggleCosmoterraPartnerModeUI() {
 async function saveCosmoterraSettings(e) {
   e.preventDefault();
   const modeRadio = document.querySelector('input[name="ct-set-partner-mode"]:checked');
+  const giftTextVal = (document.getElementById('ct-set-gift-text')?.value || '').trim() || DEFAULT_COSMOTERRA_GIFT_TEXT;
   const payload = {
     cosmoterra_enabled: document.getElementById('ct-set-enabled').checked ? 1 : 0,
     cosmoterra_partner_name: document.getElementById('ct-set-partner-name').value.trim(),
     cosmoterra_partner_address: document.getElementById('ct-set-partner-address').value.trim(),
     cosmoterra_partner_gp_nr: document.getElementById('ct-set-partner-gp-nr').value.trim(),
-    cosmoterra_partner_mode: modeRadio ? modeRadio.value : 'text'
+    cosmoterra_partner_mode: modeRadio ? modeRadio.value : 'text',
+    cosmoterra_gift_text: giftTextVal
   };
 
   const res = await fetch('/api/settings', {
@@ -301,9 +315,7 @@ function openCosmoterraModal() {
     imgBlock.classList.add('hidden');
   }
 
-  document.getElementById('ct-gift-footer-text').textContent = partnerName
-    ? `Geschenk von Herzen von deinem Berater ${partnerName}`
-    : 'Geschenk von Herzen von deinem Berater';
+  document.getElementById('ct-gift-footer-text').textContent = resolveCosmoterraGiftText(appSettings);
 
   document.getElementById('ct-product-search').value = '';
   document.getElementById('ct-inv-desc').value = '';

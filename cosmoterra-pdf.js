@@ -585,9 +585,8 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
   if (anyGift) {
     const giftBottomY = catalog.RIGHT_Y[catalog.GIFT_FOOTER_ROW_INDEX];
     drawHeart(page, ox(367.5), giftBottomY, 0.38);
-    const giftText = partnerName
-      ? `Geschenk von Herzen von deinem Berater ${partnerName}`
-      : 'Geschenk von Herzen von deinem Berater';
+    const giftTemplate = (settings.cosmoterra_gift_text || '').trim() || 'Geschenk von Herzen von deinem Berater {NAME}';
+    const giftText = giftTemplate.replace(/\{NAME\}/gi, partnerName).replace(/\s+/g, ' ').trim();
     drawFittedText(page, giftText, {
       x: ox(374.5),
       y: giftBottomY + 3.6,
