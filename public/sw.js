@@ -1,8 +1,10 @@
-const CACHE_NAME = 'rechnungs-log-v3';
+const CACHE_NAME = 'rechnungs-log-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/app.js',
+  '/cosmoterra-catalog.js',
+  '/cosmoterra.js',
   '/favicon.svg',
   '/rl-app-icon-192.png',
   '/rl-app-icon-512.png',

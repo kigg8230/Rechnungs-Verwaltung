@@ -4,14 +4,18 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const { DatabaseSync } = require('node:sqlite');
+const { generateCosmoterraPdf } = require('./cosmoterra-pdf');
+const cosmoterraCatalog = require('./public/cosmoterra-catalog');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Ensure data & upload directories exist
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const PARTNER_UPLOADS_DIR = path.join(UPLOADS_DIR, 'settings');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+fs.mkdirSync(PARTNER_UPLOADS_DIR, { recursive: true });
 
 // Initialize SQLite database
 const dbPath = path.join(DATA_DIR, 'rechnungs-log.db');
@@ -57,7 +61,13 @@ db.exec(`
     next_sequence INTEGER NOT NULL DEFAULT 1,
     yearly_reset INTEGER NOT NULL DEFAULT 1,
     last_reset_year INTEGER NOT NULL DEFAULT 2026,
-    default_sort_order TEXT NOT NULL DEFAULT 'date_desc'
+    default_sort_order TEXT NOT NULL DEFAULT 'date_desc',
+    cosmoterra_enabled INTEGER NOT NULL DEFAULT 0,
+    cosmoterra_partner_mode TEXT NOT NULL DEFAULT 'text',
+    cosmoterra_partner_name TEXT NOT NULL DEFAULT '',
+    cosmoterra_partner_address TEXT NOT NULL DEFAULT '',
+    cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '',
+    cosmoterra_partner_image TEXT NOT NULL DEFAULT ''
   );
 
   INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year)
@@ -125,11 +135,22 @@ db.exec(`
   );
 `);
 
-// Safe migration for existing databases: add default_sort_order column if missing
-try {
-  db.exec("ALTER TABLE settings ADD COLUMN default_sort_order TEXT NOT NULL DEFAULT 'date_desc';");
-} catch (e) {
-  // Column already exists
+// Safe migration for existing databases: add new settings columns if missing
+const safeSettingsAlterStatements = [
+  "ALTER TABLE settings ADD COLUMN default_sort_order TEXT NOT NULL DEFAULT 'date_desc';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_enabled INTEGER NOT NULL DEFAULT 0;",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_mode TEXT NOT NULL DEFAULT 'text';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_name TEXT NOT NULL DEFAULT '';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_address TEXT NOT NULL DEFAULT '';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_partner_image TEXT NOT NULL DEFAULT '';"
+];
+for (const sql of safeSettingsAlterStatements) {
+  try {
+    db.exec(sql);
+  } catch (e) {
+    // Column already exists
+  }
 }
 
 // Migration: invoice_payments table
@@ -182,7 +203,7 @@ function getValidSession(req) {
 }
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Auth Endpoints (unprotected)
@@ -271,6 +292,151 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
 });
 
+// Multer setup for Cosmoterra partner header graphic (PNG / JPEG)
+const partnerImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(PARTNER_UPLOADS_DIR, { recursive: true });
+    cb(null, PARTNER_UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = file.mimetype === 'image/jpeg' || /\.(jpe?g)$/i.test(file.originalname) ? '.jpg' : '.png';
+    cb(null, `cosmoterra-partner-${Date.now()}${ext}`);
+  }
+});
+const uploadPartnerImage = multer({
+  storage: partnerImageStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg' || /\.(png|jpe?g)$/i.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Nur PNG- oder JPG-Grafiken sind erlaubt!'));
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+function removeUploadFileIfExists(relPath) {
+  if (!relPath) return;
+  const resolved = path.resolve(UPLOADS_DIR, relPath);
+  const root = path.resolve(UPLOADS_DIR);
+  if (resolved.startsWith(root) && fs.existsSync(resolved)) {
+    try {
+      fs.unlinkSync(resolved);
+    } catch (err) {
+      console.error('Warnung beim Entfernen einer alten Upload-Datei:', err.message);
+    }
+  }
+}
+
+function sanitizeFilenameSegment(str) {
+  return String(str || '')
+    .replace(/[\/\\:*?"<>|\r\n\t]+/g, '-')
+    .replace(/\s+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80);
+}
+
+function resolveInvoiceNumberAndSequence(settings, invoiceDate, requestedInvoiceNumber) {
+  let nextSeq = settings.next_sequence;
+  const invYear = new Date(invoiceDate).getFullYear();
+  if (settings.yearly_reset && invYear > settings.last_reset_year) {
+    nextSeq = 1;
+  }
+
+  let invoiceNumber = String(requestedInvoiceNumber || '').trim();
+  let usedGeneratedSeq = false;
+  if (!invoiceNumber) {
+    invoiceNumber = formatInvoiceNumber(settings, invoiceDate, nextSeq);
+    usedGeneratedSeq = true;
+  } else {
+    const expectedAuto = formatInvoiceNumber(settings, invoiceDate, nextSeq);
+    if (invoiceNumber === expectedAuto) {
+      usedGeneratedSeq = true;
+    }
+  }
+
+  const sequenceNum = usedGeneratedSeq ? nextSeq : (parseInt(invoiceNumber.replace(/\D/g, ''), 10) || 0);
+  return { nextSeq, invYear, invoiceNumber, usedGeneratedSeq, sequenceNum };
+}
+
+function computeCosmoterraSummary(payload = {}) {
+  const catalogByKey = new Map();
+  for (const p of [...cosmoterraCatalog.LEFT_PRODUCTS, ...cosmoterraCatalog.RIGHT_PRODUCTS]) {
+    catalogByKey.set(`${p.side}:${p.rowIndex}`, p);
+  }
+
+  let grandTotal = 0;
+  let itemCount = 0;
+  const descParts = [];
+
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  for (const item of items) {
+    const side = item.side === 'right' ? 'right' : 'left';
+    const rowIndex = Number(item.rowIndex);
+    const catItem = catalogByKey.get(`${side}:${rowIndex}`);
+    if (!catItem) continue;
+
+    const qty = Math.max(0, Number(item.qty) || 0);
+    if (qty <= 0) continue;
+
+    itemCount++;
+    const unitPrice =
+      item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== ''
+        ? Math.max(0, Number(item.unitPrice) || 0)
+        : catItem.price;
+    const isAction = Boolean(item.isAction) || Math.abs(unitPrice - catItem.price) > 0.001;
+    const isGift = Boolean(item.isGift);
+
+    if (!isGift) {
+      grandTotal += Math.round(qty * unitPrice * 100) / 100;
+    }
+
+    let label = `${qty}x ${catItem.name}`;
+    if (isAction) label += ' (A)';
+    if (isGift) label += ' (Geschenk)';
+    descParts.push(label);
+  }
+
+  const manualRows = Array.isArray(payload.manualRows) ? payload.manualRows : [];
+  for (let i = 0; i < cosmoterraCatalog.MANUAL_ROW_INDICES.length; i++) {
+    const row = manualRows[i];
+    if (!row) continue;
+
+    const nr = (row.nr || '').trim();
+    const name = (row.name || '').trim();
+    const qty = Math.max(0, Number(row.qty) || 0);
+    const hasUnitPrice = row.unitPrice !== undefined && row.unitPrice !== null && String(row.unitPrice).trim() !== '';
+    const unitPrice = hasUnitPrice ? Math.max(0, Number(row.unitPrice) || 0) : null;
+    const hasManualTotal = row.total !== undefined && row.total !== null && String(row.total).trim() !== '';
+    const manualTotalVal = hasManualTotal ? Math.max(0, Number(row.total) || 0) : null;
+    const isAction = Boolean(row.isAction);
+    const isGift = Boolean(row.isGift);
+
+    if (!nr && !name && qty <= 0 && !hasUnitPrice && !hasManualTotal && !isGift) continue;
+    itemCount++;
+
+    if (!isGift) {
+      if (qty > 0 && hasUnitPrice) {
+        grandTotal += Math.round(qty * unitPrice * 100) / 100;
+      } else if (hasManualTotal) {
+        grandTotal += Math.round(manualTotalVal * 100) / 100;
+      }
+    }
+
+    const baseName = name || (nr ? `Art. ${nr}` : 'Freie Position');
+    let label = qty > 0 ? `${qty}x ${baseName}` : baseName;
+    if (isAction) label += ' (A)';
+    if (isGift) label += ' (Geschenk)';
+    descParts.push(label);
+  }
+
+  return {
+    grandTotal: Math.round(grandTotal * 100) / 100,
+    itemCount,
+    autoDescription: descParts.join(', ')
+  };
+}
+
 // Helper: Recompute invoice paid status based on payments
 function updateInvoicePaidStatusFromPayments(invoiceId) {
   const inv = db.prepare('SELECT amount, is_paid, paid_at FROM invoices WHERE id = ?').get(invoiceId);
@@ -353,33 +519,88 @@ app.get('/api/settings', (req, res) => {
 
 app.put('/api/settings', (req, res) => {
   const prev = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  const {
-    prefix_schema = '',
-    suffix_schema = '',
-    number_digits = 5,
-    next_sequence = 1,
-    yearly_reset = 1,
-    default_sort_order = 'date_desc'
-  } = req.body;
+  const body = req.body || {};
 
-  const validSort = default_sort_order === 'date_asc' ? 'date_asc' : 'date_desc';
+  const prefix_schema = body.prefix_schema !== undefined ? String(body.prefix_schema) : prev.prefix_schema;
+  const suffix_schema = body.suffix_schema !== undefined ? String(body.suffix_schema) : prev.suffix_schema;
+  const number_digits = body.number_digits !== undefined ? (Number(body.number_digits) || 5) : prev.number_digits;
+  const next_sequence = body.next_sequence !== undefined ? Math.max(1, Number(body.next_sequence) || 1) : prev.next_sequence;
+  const yearly_reset = body.yearly_reset !== undefined ? (body.yearly_reset ? 1 : 0) : prev.yearly_reset;
+  const rawSort = body.default_sort_order !== undefined ? body.default_sort_order : prev.default_sort_order;
+  const validSort = rawSort === 'date_asc' ? 'date_asc' : 'date_desc';
+
+  const cosmoterra_enabled = body.cosmoterra_enabled !== undefined ? (body.cosmoterra_enabled ? 1 : 0) : (prev.cosmoterra_enabled ? 1 : 0);
+  const rawMode = body.cosmoterra_partner_mode !== undefined ? body.cosmoterra_partner_mode : prev.cosmoterra_partner_mode;
+  const cosmoterra_partner_mode = rawMode === 'image' ? 'image' : 'text';
+  const cosmoterra_partner_name = body.cosmoterra_partner_name !== undefined ? String(body.cosmoterra_partner_name).trim() : (prev.cosmoterra_partner_name || '');
+  const cosmoterra_partner_address = body.cosmoterra_partner_address !== undefined ? String(body.cosmoterra_partner_address).trim() : (prev.cosmoterra_partner_address || '');
+  const cosmoterra_partner_gp_nr = body.cosmoterra_partner_gp_nr !== undefined ? String(body.cosmoterra_partner_gp_nr).trim() : (prev.cosmoterra_partner_gp_nr || '');
+
   const currentYear = new Date().getFullYear();
   db.prepare(`
     UPDATE settings
-    SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?
+    SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
+        cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?
     WHERE id = 1
   `).run(
-    String(prefix_schema),
-    String(suffix_schema),
-    Number(number_digits) || 5,
-    Math.max(1, Number(next_sequence) || 1),
-    yearly_reset ? 1 : 0,
+    prefix_schema,
+    suffix_schema,
+    number_digits,
+    next_sequence,
+    yearly_reset,
     currentYear,
-    validSort
+    validSort,
+    cosmoterra_enabled,
+    cosmoterra_partner_mode,
+    cosmoterra_partner_name,
+    cosmoterra_partner_address,
+    cosmoterra_partner_gp_nr
   );
 
   const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
-  logAction('settings', 1, 'UPDATE', 'Einstellungen / Rechnungsnummer-Schema geändert', prev, updated);
+  logAction('settings', 1, 'UPDATE', 'Einstellungen geändert', prev, updated);
+
+  const preview = formatInvoiceNumber(updated, new Date().toISOString().slice(0, 10), updated.next_sequence);
+  res.json({ ...updated, preview_next: preview });
+});
+
+app.post('/api/settings/cosmoterra-image', (req, res) => {
+  uploadPartnerImage.single('image')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Fehler beim Hochladen der Grafik.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Keine Grafikdatei ausgewählt.' });
+    }
+
+    const prev = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    if (prev && prev.cosmoterra_partner_image) {
+      removeUploadFileIfExists(prev.cosmoterra_partner_image);
+    }
+
+    const relPath = `settings/${req.file.filename}`;
+    db.prepare('UPDATE settings SET cosmoterra_partner_image = ?, cosmoterra_partner_mode = ? WHERE id = 1')
+      .run(relPath, 'image');
+
+    const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    logAction('settings', 1, 'UPDATE', 'Cosmoterra Partner-Grafik hochgeladen', prev, updated);
+
+    const preview = formatInvoiceNumber(updated, new Date().toISOString().slice(0, 10), updated.next_sequence);
+    res.json({ ...updated, preview_next: preview, image_url: `/uploads/${relPath}` });
+  });
+});
+
+app.delete('/api/settings/cosmoterra-image', (req, res) => {
+  const prev = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  if (prev && prev.cosmoterra_partner_image) {
+    removeUploadFileIfExists(prev.cosmoterra_partner_image);
+  }
+
+  db.prepare('UPDATE settings SET cosmoterra_partner_image = ?, cosmoterra_partner_mode = ? WHERE id = 1')
+    .run('', 'text');
+
+  const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  logAction('settings', 1, 'UPDATE', 'Cosmoterra Partner-Grafik entfernt', prev, updated);
 
   const preview = formatInvoiceNumber(updated, new Date().toISOString().slice(0, 10), updated.next_sequence);
   res.json({ ...updated, preview_next: preview });
@@ -657,28 +878,8 @@ app.post('/api/invoices', upload.single('pdf'), (req, res) => {
   const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
   const invoiceDate = req.body.invoice_date || new Date().toISOString().slice(0, 10);
 
-  // Check yearly reset
-  let nextSeq = settings.next_sequence;
-  const invYear = new Date(invoiceDate).getFullYear();
-  if (settings.yearly_reset && invYear > settings.last_reset_year) {
-    nextSeq = 1;
-  }
-
-  let invoiceNumber = (req.body.invoice_number || '').trim();
-  let usedGeneratedSeq = false;
-  if (!invoiceNumber) {
-    invoiceNumber = formatInvoiceNumber(settings, invoiceDate, nextSeq);
-    usedGeneratedSeq = true;
-  } else {
-    // Check if the supplied invoiceNumber matches the auto-generated preview
-    const expectedAuto = formatInvoiceNumber(settings, invoiceDate, nextSeq);
-    if (invoiceNumber === expectedAuto) {
-      usedGeneratedSeq = true;
-    }
-  }
-
-  // Extract numeric part if custom, or use nextSeq
-  let sequenceNum = usedGeneratedSeq ? nextSeq : (parseInt(invoiceNumber.replace(/\D/g, ''), 10) || 0);
+  const { nextSeq, invYear, invoiceNumber, usedGeneratedSeq, sequenceNum } =
+    resolveInvoiceNumberAndSequence(settings, invoiceDate, req.body.invoice_number);
 
   const description = (req.body.description || '').trim();
   const rawAmount = String(req.body.amount || '0').replace(',', '.');
@@ -715,6 +916,107 @@ app.post('/api/invoices', upload.single('pdf'), (req, res) => {
   );
 
   res.status(201).json(created);
+});
+
+// ==================== COSMOTERRA DIGITAL INVOICE API ====================
+
+app.post('/api/cosmoterra/preview', async (req, res) => {
+  try {
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    const pdfBytes = await generateCosmoterraPdf(req.body || {}, settings, UPLOADS_DIR);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="Cosmoterra-Vorschau.pdf"');
+    res.send(Buffer.from(pdfBytes));
+  } catch (err) {
+    console.error('Cosmoterra Preview Fehler:', err);
+    res.status(500).json({ error: 'PDF-Vorschau fehlgeschlagen: ' + err.message });
+  }
+});
+
+app.post('/api/cosmoterra/invoices', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const customerId = Number(body.customer_id);
+    const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
+    if (!customer) return res.status(404).json({ error: 'Kunde nicht gefunden' });
+
+    const summary = computeCosmoterraSummary(body);
+    if (summary.itemCount === 0) {
+      return res.status(400).json({ error: 'Bitte mindestens eine Artikelmenge, freie Zeile oder ein Geschenk erfassen.' });
+    }
+
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    const invoiceDate = (body.invoice_date || new Date().toISOString().slice(0, 10)).trim();
+    const { nextSeq, invYear, invoiceNumber, usedGeneratedSeq, sequenceNum } =
+      resolveInvoiceNumberAndSequence(settings, invoiceDate, body.invoice_number);
+
+    const customerDisplayName =
+      (body.customer_name || '').trim() ||
+      `${customer.last_name}${customer.first_name ? ' ' + customer.first_name : ''}`;
+
+    const pdfBytes = await generateCosmoterraPdf(
+      { ...body, invoice_date: invoiceDate, invoice_number: invoiceNumber },
+      settings,
+      UPLOADS_DIR
+    );
+
+    // Create monthly YYYYMM directory (e.g. "202611")
+    const ymMatch = invoiceDate.match(/^(\d{4})-(\d{2})/);
+    const now = new Date();
+    const ymFolder = ymMatch
+      ? `${ymMatch[1]}${ymMatch[2]}`
+      : `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const targetDir = path.join(UPLOADS_DIR, ymFolder);
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const safeInv = sanitizeFilenameSegment(invoiceNumber) || 'Rechnung';
+    const safeCust = sanitizeFilenameSegment(customerDisplayName) || `Kunde_${customer.id}`;
+    const baseName = `${safeInv}_${safeCust}`;
+
+    let finalFileName = `${baseName}.pdf`;
+    let counter = 2;
+    while (fs.existsSync(path.join(targetDir, finalFileName))) {
+      finalFileName = `${baseName}_${counter}.pdf`;
+      counter++;
+    }
+
+    fs.writeFileSync(path.join(targetDir, finalFileName), Buffer.from(pdfBytes));
+
+    const pdfFilename = `${ymFolder}/${finalFileName}`;
+    const pdfOriginalName = finalFileName;
+    const description = (body.description || '').trim() || summary.autoDescription;
+    const amount = summary.grandTotal;
+    const isPaid = body.is_paid === true || body.is_paid === 'true' || body.is_paid === 1 || body.is_paid === '1' ? 1 : 0;
+    const paidAt = isPaid ? new Date().toISOString() : null;
+
+    const info = db.prepare(`
+      INSERT INTO invoices (customer_id, invoice_date, invoice_number, sequence_num, description, amount, is_paid, paid_at, pdf_filename, pdf_original_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(customerId, invoiceDate, invoiceNumber, sequenceNum, description, amount, isPaid, paidAt, pdfFilename, pdfOriginalName);
+
+    const prevSettings = { ...settings };
+    if (usedGeneratedSeq) {
+      db.prepare('UPDATE settings SET next_sequence = ?, last_reset_year = ? WHERE id = 1').run(nextSeq + 1, invYear);
+    }
+
+    const created = db.prepare('SELECT * FROM invoices WHERE id = ?').get(Number(info.lastInsertRowid));
+    logAction(
+      'invoices',
+      created.id,
+      'CREATE',
+      `Cosmoterra-Rechnung ${created.invoice_number} (${created.amount.toFixed(2)} €) bei ${customer.last_name} erstellt`,
+      { prevSettings: usedGeneratedSeq ? prevSettings : null },
+      created
+    );
+
+    res.status(201).json({
+      ...created,
+      pdf_url: `/uploads/${ymFolder}/${encodeURIComponent(finalFileName)}`
+    });
+  } catch (err) {
+    console.error('Cosmoterra Invoice Fehler:', err);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Cosmoterra-Rechnung: ' + err.message });
+  }
 });
 
 app.put('/api/invoices/:id', upload.single('pdf'), (req, res) => {
@@ -972,9 +1274,24 @@ app.post('/api/undo', (req, res) => {
     } else if (lastLog.entity_type === 'settings') {
       db.prepare(`
         UPDATE settings
-        SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?
+        SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
+            cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?, cosmoterra_partner_image = ?
         WHERE id = 1
-      `).run(prev.prefix_schema, prev.suffix_schema, prev.number_digits, prev.next_sequence, prev.yearly_reset, prev.last_reset_year, prev.default_sort_order || 'date_desc');
+      `).run(
+        prev.prefix_schema,
+        prev.suffix_schema,
+        prev.number_digits,
+        prev.next_sequence,
+        prev.yearly_reset,
+        prev.last_reset_year,
+        prev.default_sort_order || 'date_desc',
+        prev.cosmoterra_enabled ? 1 : 0,
+        prev.cosmoterra_partner_mode || 'text',
+        prev.cosmoterra_partner_name || '',
+        prev.cosmoterra_partner_address || '',
+        prev.cosmoterra_partner_gp_nr || '',
+        prev.cosmoterra_partner_image || ''
+      );
     }
 
     db.prepare('UPDATE audit_log SET undone = 1 WHERE id = ?').run(lastLog.id);

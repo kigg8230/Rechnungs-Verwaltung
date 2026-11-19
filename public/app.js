@@ -143,7 +143,14 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function showToast(message, type = 'success', showUndo = false) {
+function encodeUploadPath(relPath) {
+  return String(relPath || '')
+    .split('/')
+    .map(seg => encodeURIComponent(seg))
+    .join('/');
+}
+
+function showToast(message, type = 'success', showUndo = false, extraHtml = '') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   const bg = type === 'error' ? 'bg-rose-600' : 'bg-slate-900';
@@ -151,6 +158,7 @@ function showToast(message, type = 'success', showUndo = false) {
   toast.className = `${bg} text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 text-sm flex items-center gap-3 transition-all duration-300`;
   toast.innerHTML = `
     <span>${escapeHtml(message)}</span>
+    ${extraHtml || ''}
     ${showUndo ? `<button onclick="undoLastAction(); this.parentElement.remove();" class="px-2.5 py-1 bg-amber-400 text-slate-950 font-bold text-xs rounded-md hover:bg-amber-300 transition">↩ Rückgängig</button>` : ''}
   `;
   container.appendChild(toast);
@@ -211,6 +219,8 @@ async function loadSettings() {
   if (invNumberInput && !invNumberInput.value) {
     invNumberInput.value = appSettings.preview_next;
   }
+
+  if (typeof syncCosmoterraUI === 'function') syncCosmoterraUI();
 }
 
 async function updateInvoiceNumberPreview(force = false) {
@@ -277,6 +287,7 @@ async function saveSettings(e) {
     const custSortEl = document.getElementById('cust-invoice-sort');
     if (custSortEl) custSortEl.value = appSettings.default_sort_order || 'date_desc';
     if (currentCustomer) renderCustomerInvoices();
+    if (typeof syncCosmoterraUI === 'function') syncCosmoterraUI();
     await loadAuditLogs();
     showToast('Einstellungen gespeichert!', 'success', true);
   } else {
@@ -390,6 +401,7 @@ function updateCustomerDetailView() {
 
   renderCustomerDocuments();
   renderCustomerInvoices();
+  if (typeof syncCosmoterraUI === 'function') syncCosmoterraUI();
 }
 
 function copyShippingAddress() {
@@ -516,7 +528,7 @@ function renderCustomerDocuments() {
   listEl.innerHTML = docs.map(d => `
     <div class="py-2 flex items-center justify-between gap-2">
       <div class="min-w-0">
-        <a href="/uploads/${encodeURIComponent(d.file_name)}" target="_blank"
+        <a href="/uploads/${encodeUploadPath(d.file_name)}" target="_blank"
           class="font-semibold text-blue-600 hover:underline flex items-center gap-1 truncate">
           <span>📄</span> ${escapeHtml(d.original_name)}
         </a>
@@ -665,7 +677,7 @@ function renderCustomerInvoices() {
     }
 
     const pdfLink = inv.pdf_filename
-      ? `<a href="/uploads/${encodeURIComponent(inv.pdf_filename)}" target="_blank"
+      ? `<a href="/uploads/${encodeUploadPath(inv.pdf_filename)}" target="_blank"
            class="inline-flex items-center justify-center text-xs font-medium text-blue-600 hover:underline"
            title="${escapeHtml(inv.pdf_original_name || 'PDF öffnen')}">
            📄 PDF
@@ -1077,7 +1089,7 @@ function renderGlobalInvoices() {
     }
 
     const pdfCell = inv.pdf_filename
-      ? `<a href="/uploads/${encodeURIComponent(inv.pdf_filename)}" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline">📄 PDF</a>`
+      ? `<a href="/uploads/${encodeUploadPath(inv.pdf_filename)}" target="_blank" class="text-xs font-semibold text-blue-600 hover:underline" title="${escapeHtml(inv.pdf_original_name || 'PDF öffnen')}">📄 PDF</a>`
       : `<span class="text-slate-300 text-xs">—</span>`;
 
     let amountCell = `<div class="font-bold whitespace-nowrap ${inv.is_paid ? 'text-slate-800' : (paidAmount > 0 ? 'text-amber-700' : 'text-rose-700')}">${formatCurrency(amt)}</div>`;
