@@ -91,6 +91,12 @@
           title="Abmelden">
           🔒 Abmelden
         </button>
+
+        <button type="button" id="help-btn" onclick="openHelpModal()"
+          class="w-8 h-8 rounded-lg text-sm font-bold bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-600 transition flex items-center justify-center shadow-xs"
+          title="Hilfe &amp; Anleitung anzeigen">
+          ?
+        </button>
       </div>
     </div>
   </header>
@@ -1147,6 +1153,126 @@
       class="w-full py-2 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-xs flex items-center justify-center gap-2 transition">
       <span class="text-base">❤️</span> <span id="ct-gift-toggle-label">Als Geschenk markieren</span>
     </button>
+  </div>
+
+  <!-- ==================== MODAL: HILFE & ANLEITUNG ==================== -->
+  <div id="help-modal" onclick="if (event.target === this) closeHelpModal()"
+    class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-6 no-print">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <!-- Sticky Help Header -->
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between gap-4 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-emerald-500 text-slate-950 font-bold text-lg flex items-center justify-center shadow">?</div>
+          <div>
+            <h3 class="font-bold text-base sm:text-lg leading-tight">Hilfe &amp; Anleitung — Rechnungs-LOG</h3>
+            <p class="text-xs text-slate-400">Übersicht aller Funktionen, Shortcuts und Besonderheiten</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeHelpModal()"
+          class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition">
+          ✕ Schließen
+        </button>
+      </div>
+
+      <!-- Quick Navigation Pills -->
+      <div class="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-2 text-xs shrink-0">
+        <button type="button" onclick="scrollHelpSection('help-sec-customers')"
+          class="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 font-medium transition">👥 Kunden &amp; PDF-Ablage</button>
+        <button type="button" onclick="scrollHelpSection('help-sec-invoices')"
+          class="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 font-medium transition">📅 Rechnungen &amp; Teilzahlungen</button>
+        <button type="button" onclick="scrollHelpSection('help-sec-global')"
+          class="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 font-medium transition">📊 Gesamtliste &amp; Suche</button>
+        <button type="button" onclick="scrollHelpSection('help-sec-cosmoterra')"
+          class="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-semibold transition">🌿 Cosmoterra Rechnung</button>
+        <button type="button" onclick="scrollHelpSection('help-sec-settings')"
+          class="px-2.5 py-1 rounded-md bg-white border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 font-medium transition">⚙️ Einstellungen, Undo &amp; App</button>
+      </div>
+
+      <!-- Scrollable Content -->
+      <div id="help-modal-body" class="p-6 overflow-y-auto space-y-5 text-sm text-slate-700 scrollbar-thin">
+
+        <!-- 1. Kunden -->
+        <section id="help-sec-customers" class="bg-slate-50/70 rounded-xl border border-slate-200 p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+            <span>👥</span> 1. Kundenverzeichnis, Stammdaten &amp; PDF-Ablage
+          </h4>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+            <li><strong>Kunden suchen &amp; wählen:</strong> Oben im Suchfeld nach Nachname, Vorname, Ort, PLZ oder Straße filtern. Rote Badges (<code>❌</code>) zeigen offene Rechnungen inkl. Restbetrag pro Kunde an, grüne Haken (<code>✅</code>) bedeuten alles bezahlt.</li>
+            <li><strong>Stammdaten &amp; Versandadresse:</strong> Mit <code>＋ Neuer Kunde</code>, <code>✏️ Bearbeiten</code> oder <code>🗑️</code> verwaltest du Kundendaten. Über <code>📋 Adresse kopieren</code> landet die fertige Versandadresse direkt in der Zwischenablage.</li>
+            <li><strong>Freie Notizen:</strong> Notizen im gelblichen Textfeld werden beim Verlassen des Feldes (<code>✓ Gespeichert</code>) automatisch gesichert.</li>
+            <li><strong>📄 PDF-Ablage beim Kunden:</strong> Hier kannst du beliebige PDF-Dokumente mit Kurzbeschreibung direkt beim Kunden hochladen und jederzeit öffnen oder löschen.</li>
+          </ul>
+        </section>
+
+        <!-- 2. Rechnungen & Teilzahlungen -->
+        <section id="help-sec-invoices" class="bg-slate-50/70 rounded-xl border border-slate-200 p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+            <span>📅</span> 2. Chronologische Rechnungs- &amp; Inkasso-Liste &amp; 💰 Teilzahlungen
+          </h4>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+            <li><strong>Rechnung manuell buchen:</strong> Datum, automatische Rechnungsnummer (mit <code>↻</code> neu ladbar), freier Text, Betrag, optionales Beleg-PDF und Startstatus (<code>❌</code> Offen / <code>✅</code> Bezahlt) ausfüllen und auf <code>＋ Buchen</code> klicken.</li>
+            <li><strong>Status umschalten:</strong> Ein Klick auf den Status-Button (<code>❌ Offen</code> oder <code>✅ Bezahlt</code>) schaltet die Rechnung direkt um.</li>
+            <li><strong>💰 Teilzahlungen erfassen:</strong> Über das Geldsack-Symbol (<code>💰</code>) öffnest du die Zahlungshistorie mit Datum, Teilbetrag und Notiz. Die Liste zeigt bezahlte Summe und offenen Restbetrag an und markiert die Rechnung als <code>⏳ Teilbezahlt</code>. Sobald der volle Betrag erreicht ist, wechselt der Status automatisch auf <code>✅ Bezahlt</code>.</li>
+            <li><strong>Filter, Sortierung &amp; Korrekturen:</strong> Rechnungen lassen sich nach <em>Alle / Unbezahlt / Bezahlt</em> filtern, auf- oder absteigend sortieren sowie über <code>✏️</code> bearbeiten oder mit <code>🗑️</code> löschen.</li>
+          </ul>
+        </section>
+
+        <!-- 3. Gesamtliste -->
+        <section id="help-sec-global" class="bg-slate-50/70 rounded-xl border border-slate-200 p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+            <span>📊</span> 3. Gesamtliste &amp; Zeitraum-Kontrolle
+          </h4>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+            <li><strong>Zeitraum &amp; KPIs:</strong> Oben siehst du Gesamtumsatz, bereits bezahlte Beträge und noch offene Außenstände für den gewählten Filter (inkl. Schnellwahl: <em>Dieser Monat, Letzter Monat, Dieses Jahr</em>).</li>
+            <li><strong>Schnellsuche (auch nach Beträgen):</strong> Du kannst nach Rechnungsnummer, Kundenname, Ort, Beschreibungstext <strong>oder direkt nach einem Euro-Betrag</strong> (z. B. <code>149,50</code>) suchen.</li>
+            <li><strong>Direktsprung zum Kunden:</strong> Ein Klick auf einen Kundennamen in der Gesamtliste wechselt direkt zu diesem Kunden im Kundenverzeichnis.</li>
+            <li><strong>Export &amp; Druck:</strong> Über <code>📥 CSV / Excel Export</code> lädst du die gefilterte Liste als Excel-kompatible CSV-Datei herunter; <code>🖨️ Drucken</code> druckt die Übersicht.</li>
+          </ul>
+        </section>
+
+        <!-- 4. Cosmoterra -->
+        <section id="help-sec-cosmoterra" class="bg-emerald-50/60 rounded-xl border border-emerald-200 p-4 space-y-2.5">
+          <h4 class="font-bold text-emerald-950 text-base flex items-center gap-2">
+            <span>🌿</span> 4. Digitale Cosmoterra Rechnung
+          </h4>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs sm:text-sm text-slate-800">
+            <li><strong>Aktivierung &amp; Start:</strong> In den <em>Einstellungen</em> den Schalter <code>Digitale Cosmoterra Rechnung</code> aktivieren. Danach erscheint beim Kunden in der PDF-Ablage der grüne Button <strong>🌿 Cosmoterra Rechnung</strong>.</li>
+            <li><strong>Automatische Vorbelegung:</strong> Tagesdatum, nächste Rechnungsnummer, Name &amp; Anschrift des Kunden sowie deine eigenen Beraterdaten &amp; GP-Nr. werden automatisch eingetragen und können bei Bedarf vor dem Druck angepasst werden.</li>
+            <li><strong>Mengen &amp; Suche:</strong> Mit der Suchleiste filterst du Artikelnummern/Produktnamen. Sobald du eine <em>Anzahl</em> eingibst, werden Zeilen-Summe und <em>RECHNUNGSBETRAG</em> sofort berechnet.</li>
+            <li><strong>Aktionspreise (Doppelklick auf Einzelpreis):</strong> Änderst du per Doppelklick den Einzelpreis (z. B. von <code>€ 31,00</code> auf <code>€ 29,00</code>), wird der alte Preis auf dem PDF überdeckt und rechts neben dem Artikelnamen ein rotes großes <strong class="text-red-600">A</strong> gedruckt.</li>
+            <li><strong>Freie Zeilen &amp; Aktionen:</strong> Rechts unter den Programmen stehen 7 leere Zeilen bereit. Mit <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[11px]">Alt+A</kbd>, <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[11px]">Alt+Umschalt+A</kbd>, <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[11px]">F8</kbd> oder Klick auf den Button <strong class="text-red-600">A</strong> markierst du eine freie Zeile als Aktion.</li>
+            <li><strong>Automatische Wertmarken:</strong> Produkte mit Wertmarken multiplizieren sich mit ihrer Anzahl (ausgenommen Aktionsartikel mit rotem <strong class="text-red-600">A</strong> und Geschenke). Die Summe wird automatisch in der ersten freien Zeile als <strong>Wertmarken</strong> in die Spalte <em>Anzahl</em> eingetragen.</li>
+            <li><strong>Minus-Beträge (z. B. Stammkundenpass):</strong> In freien Zeilen kannst du in der Spalte <em>Gesamt</em> direkt einen negativen Betrag eingeben (z. B. <code>-30,-</code>) — auch wenn bei <em>Anzahl</em> und <em>Preis</em> bereits Zahlen stehen. Der Rechnungsbetrag verringert sich entsprechend.</li>
+            <li><strong>Geschenke (Doppelklick auf Gesamt):</strong> Ein Doppelklick auf eine <em>Gesamt</em>-Zelle öffnet das Herz-Menü (<code>❤️ Als Geschenk markieren</code>). Die Position erscheint als <code>- ❤️</code> (mit <code>0,00 €</code>) und über dem Rechnungsbetrag wird dein persönlicher Geschenk-Text gedruckt.</li>
+            <li><strong>Vorschau, Buchen, Drucken &amp; Monats-Archiv:</strong> Mit <code>👁️ Vorschau</code> prüfst du das A4-Vektor-PDF. <code>💾 Speichern &amp; Buchen</code> bzw. <code>🖨️ Drucken &amp; Buchen</code> erzeugt das PDF, legt es automatisch im Monatsordner <code>YYYYMM/</code> (z. B. <code>202611/238H005-2026-00001_Max_Mustermann.pdf</code>) ab, bucht die Rechnung ins Kundenkonto, zählt die Rechnungsnummer hoch und startet beim Druck-Button den Druckdialog.</li>
+          </ul>
+        </section>
+
+        <!-- 5. Einstellungen, Undo, App -->
+        <section id="help-sec-settings" class="bg-slate-50/70 rounded-xl border border-slate-200 p-4 space-y-2">
+          <h4 class="font-bold text-slate-900 text-base flex items-center gap-2">
+            <span>⚙️</span> 5. Einstellungen, ↩ Rückgängig (Undo) &amp; App-Funktionen
+          </h4>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs sm:text-sm">
+            <li><strong>Rechnungsnummern-Schema:</strong> Definiere Pre- und Post-Schema mit Platzhaltern (<code>{YYYY}</code>, <code>{YY}</code>, <code>{MM}</code>, <code>{DD}</code>), Stellenanzahl, Startzähler und optionalem Jahreswechsel-Reset auf 1.</li>
+            <li><strong>Standard-Sortierung:</strong> Lege fest, ob in Listen standardmäßig der jüngste Eintrag oben (<code>↓</code>) oder ältere Einträge zuerst (<code>↑</code>) stehen.</li>
+            <li><strong>Cosmoterra-Einstellungen:</strong> Hinterlege Berater-/Firmenname, GP-Nr., Wahl zwischen <em>Textform</em> oder hochgeladener <em>Grafik</em> (Stempel/Briefkopf für rechts oben) sowie einen eigenen Geschenk-Text (<code>{NAME}</code> als Platzhalter für deinen Namen).</li>
+            <li><strong>↩ Rückgängig &amp; 🕒 Verlauf:</strong> Über den orangen Button oben rechts kannst du versehentliche Buchungen, Statuswechsel, Teilzahlungen, Löschungen oder Einstellungsänderungen rückgängig machen (inkl. Zurücksetzen des Rechnungsnummern-Zählers).</li>
+            <li><strong>🔐 Zugangsdaten &amp; 📲 Desktop-App:</strong> Benutzername/Passwort jederzeit in den Einstellungen ändern. In unterstützten Browsern lässt sich Rechnungs-LOG über <code>📲 App installieren</code> direkt als App auf Desktop oder Handy installieren.</li>
+          </ul>
+        </section>
+
+      </div>
+
+      <!-- Sticky Footer -->
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
+        <span>Tipp: Du kannst dieses Fenster jederzeit auch mit <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[11px]">Esc</kbd> schließen.</span>
+        <button type="button" onclick="closeHelpModal()"
+          class="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg transition">
+          Verstanden
+        </button>
+      </div>
+    </div>
   </div>
 
   <script src="/cosmoterra-catalog.js"></script>

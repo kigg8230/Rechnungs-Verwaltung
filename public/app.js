@@ -1238,3 +1238,31 @@ async function undoLastAction(logId = null) {
     showToast(err.error || 'Rückgängig nicht möglich', 'error');
   }
 }
+
+// ==================== HELP MODAL ====================
+function openHelpModal() {
+  const modal = document.getElementById('help-modal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  const body = document.getElementById('help-modal-body');
+  if (body) body.scrollTop = 0;
+}
+
+function closeHelpModal() {
+  const modal = document.getElementById('help-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function scrollHelpSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const helpModal = document.getElementById('help-modal');
+    if (helpModal && !helpModal.classList.contains('hidden')) {
+      closeHelpModal();
+    }
+  }
+});
