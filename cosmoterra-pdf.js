@@ -211,25 +211,25 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
     minSize: 7.5
   });
   drawFittedText(page, customerName, {
-    x: ox(123),
+    x: ox(138),
     y: 770.8,
-    maxWidth: 225,
+    maxWidth: 210,
     font: fontBold,
     baseSize: 9.5,
     minSize: 6.5
   });
   drawFittedText(page, customerAddress, {
-    x: ox(135),
+    x: ox(138),
     y: 752.8,
-    maxWidth: 213,
+    maxWidth: 210,
     font: fontRegular,
     baseSize: 9.0,
     minSize: 6.0
   });
   drawFittedText(page, invoiceDateDE, {
-    x: ox(126),
+    x: ox(138),
     y: 734.0,
-    maxWidth: 222,
+    maxWidth: 210,
     font: fontRegular,
     baseSize: 9.5,
     minSize: 7.0
@@ -290,17 +290,17 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
 
   if (!drewImage) {
     drawFittedText(page, partnerName, {
-      x: ox(396),
+      x: ox(410),
       y: 769.8,
-      maxWidth: 224,
+      maxWidth: 210,
       font: fontBold,
       baseSize: 9.5,
       minSize: 6.5
     });
     drawFittedText(page, partnerAddress.replace(/\r?\n+/g, ', '), {
-      x: ox(408),
+      x: ox(410),
       y: 751.8,
-      maxWidth: 212,
+      maxWidth: 210,
       font: fontRegular,
       baseSize: 9.0,
       minSize: 6.0
@@ -309,9 +309,9 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
 
   // Always print GP-Nr. in the bottom right header line
   drawFittedText(page, partnerGpNr, {
-    x: ox(398),
+    x: ox(410),
     y: 733.8,
-    maxWidth: 222,
+    maxWidth: 210,
     font: fontBold,
     baseSize: 9.5,
     minSize: 7.0
