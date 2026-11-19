@@ -8,25 +8,39 @@ let ctBusy = false;
 
 // ==================== UTILITIES ====================
 function ctParseNum(val) {
+  if (typeof val === 'number') return Number.isFinite(val) ? val : NaN;
   if (val === null || val === undefined) return NaN;
   let s = String(val).trim().replace(/[€\s]/g, '');
+  if (!s) return NaN;
+  s = s.replace(/,\s*[-–—]+$/, '');
   if (!s) return NaN;
   if (s.includes(',') && s.includes('.')) {
     s = s.replace(/\./g, '').replace(',', '.');
   } else {
     s = s.replace(',', '.');
   }
-  return parseFloat(s);
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function ctFormatGermanDecimal(absNum) {
+  const fixed = absNum.toFixed(2);
+  const [intPart, decPart] = fixed.split('.');
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${withThousands},${decPart}`;
 }
 
 function ctFormatEur(val) {
   const num = Math.round((Number(val) || 0) * 100) / 100;
-  return '€ ' + num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (num < 0) {
+    return `- € ${ctFormatGermanDecimal(Math.abs(num))}`;
+  }
+  return `€ ${ctFormatGermanDecimal(num)}`;
 }
 
 function ctFormatPricePlain(val) {
   const num = Math.round((Number(val) || 0) * 100) / 100;
-  return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (num < 0 ? '-' : '') + ctFormatGermanDecimal(Math.abs(num));
 }
 
 function ctEscapeAttr(str) {
@@ -210,6 +224,7 @@ function resetCosmoterraEditorState() {
       name: p.name,
       ust: p.ust,
       defaultPrice: p.price,
+      wertmarken: Number(p.wertmarken) || 0,
       missingEq: Boolean(p.missingEq),
       qty: '',
       unitPrice: p.price,
@@ -218,20 +233,26 @@ function resetCosmoterraEditorState() {
     };
   }
 
-  ctManualRows = cat.MANUAL_ROW_INDICES.map(() => ({
+  ctManualRows = cat.MANUAL_ROW_INDICES.map(() => createEmptyManualRow());
+
+  ctPaidState = false;
+  ctDescManuallyEdited = false;
+  ctGiftTarget = null;
+}
+
+function createEmptyManualRow() {
+  return {
     nr: '',
     name: '',
     ust: '',
     qty: '',
     unitPrice: '',
     total: '',
+    manualTotalOverride: false,
     isAction: false,
-    isGift: false
-  }));
-
-  ctPaidState = false;
-  ctDescManuallyEdited = false;
-  ctGiftTarget = null;
+    isGift: false,
+    isAutoWertmarken: false
+  };
 }
 
 function openCosmoterraModal() {
@@ -361,10 +382,11 @@ function buildPreprintedRowHtml(item) {
 
 function buildManualRowHtml(idx) {
   const row = ctManualRows[idx];
+  const rowBg = row.isAutoWertmarken ? 'bg-emerald-50/50 hover:bg-emerald-50/70' : 'bg-amber-50/20 hover:bg-amber-50/40';
   return `
-    <tr id="ct-manual-row-${idx}" class="border-b border-slate-300 bg-amber-50/20 hover:bg-amber-50/40">
+    <tr id="ct-manual-row-${idx}" class="border-b border-slate-300 ${rowBg}">
       <td class="border-r border-slate-300 p-0.5">
-        <input type="text" value="${ctEscapeAttr(row.nr)}" placeholder="Nr."
+        <input type="text" id="ct-m-nr-${idx}" value="${ctEscapeAttr(row.nr)}" placeholder="Nr."
           oninput="onCosmoterraManualField(${idx}, 'nr', this.value)"
           onkeydown="handleCosmoterraManualKeydown(event, ${idx})"
           class="w-full px-1 py-0.5 font-mono text-[10px] border border-transparent hover:border-slate-300 focus:border-emerald-500 rounded bg-transparent focus:bg-white focus:outline-none" />
@@ -374,7 +396,7 @@ function buildManualRowHtml(idx) {
           <input type="text" id="ct-m-name-${idx}" value="${ctEscapeAttr(row.name)}" placeholder="Freie Zeile / Artikel..."
             oninput="onCosmoterraManualField(${idx}, 'name', this.value)"
             onkeydown="handleCosmoterraManualKeydown(event, ${idx})"
-            class="flex-1 min-w-0 px-1 py-0.5 text-[11px] border border-transparent hover:border-slate-300 focus:border-emerald-500 rounded bg-transparent focus:bg-white focus:outline-none" />
+            class="flex-1 min-w-0 px-1 py-0.5 text-[11px] ${row.isAutoWertmarken ? 'font-semibold text-emerald-900' : ''} border border-transparent hover:border-slate-300 focus:border-emerald-500 rounded bg-transparent focus:bg-white focus:outline-none" />
           <button type="button" id="ct-m-action-btn-${idx}" onclick="toggleCosmoterraManualAction(${idx})"
             title="Als Aktion (A) markieren — Tastenkombination: Alt+A / Alt+Umschalt+A / F8"
             class="px-1 rounded text-[11px] font-bold shrink-0 transition ${row.isAction ? 'text-red-600 bg-red-50 border border-red-300' : 'text-slate-300 hover:text-red-500 hover:bg-red-50/60'}">
@@ -383,7 +405,7 @@ function buildManualRowHtml(idx) {
         </div>
       </td>
       <td class="border-r border-slate-300 p-0.5">
-        <input type="text" value="${ctEscapeAttr(row.ust)}" placeholder="10%"
+        <input type="text" id="ct-m-ust-${idx}" value="${ctEscapeAttr(row.ust)}" placeholder="10%"
           oninput="onCosmoterraManualField(${idx}, 'ust', this.value)"
           onkeydown="handleCosmoterraManualKeydown(event, ${idx})"
           class="w-9 px-0.5 py-0.5 text-center text-[10px] border border-transparent hover:border-slate-300 focus:border-emerald-500 rounded bg-transparent focus:bg-white focus:outline-none" />
@@ -398,12 +420,13 @@ function buildManualRowHtml(idx) {
       <td class="border-r border-slate-300 p-0.5">
         <input type="text" inputmode="decimal" id="ct-m-price-${idx}" value="${ctEscapeAttr(row.unitPrice)}" placeholder="€"
           oninput="onCosmoterraManualField(${idx}, 'unitPrice', this.value)"
+          onblur="onCosmoterraManualPriceBlur(${idx})"
           onkeydown="handleCosmoterraManualKeydown(event, ${idx})"
           class="w-16 px-1 py-0.5 text-right text-[11px] border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
       </td>
       <td class="border-r border-slate-300 px-0.5 py-0.5 text-center text-slate-400">=</td>
       <td id="ct-m-total-cell-${idx}" ondblclick="openCosmoterraGiftPopover(event, 'manual', ${idx})"
-          title="Doppelklick: Als Geschenk ❤️ markieren"
+          title="Doppelklick: Als Geschenk ❤️ markieren (oder direkt Betrag / Minusbetrag z. B. -30,- eingeben)"
           class="p-0.5 text-right cursor-pointer select-none">
         ${renderManualTotalInnerHtml(idx)}
       </td>
@@ -411,23 +434,27 @@ function buildManualRowHtml(idx) {
   `;
 }
 
+function getManualTotalInputClass(valStr) {
+  const num = ctParseNum(valStr);
+  let toneClass = 'text-slate-800';
+  if (!isNaN(num)) {
+    if (num < 0) toneClass = 'text-rose-700';
+    else if (num > 0) toneClass = 'text-emerald-700';
+  }
+  return `w-20 px-1 py-0.5 text-right font-bold text-[11px] border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 ${toneClass}`;
+}
+
 function renderManualTotalInnerHtml(idx) {
   const row = ctManualRows[idx];
   if (row.isGift) {
     return `<div ondblclick="openCosmoterraGiftPopover(event, 'manual', ${idx})" class="px-1 py-0.5 font-bold text-rose-600 flex items-center justify-center gap-1" title="Geschenk (Doppelklick zum Aufheben)"><span>-</span><span>❤️</span></div>`;
   }
-  const q = ctParseNum(row.qty);
-  const p = ctParseNum(row.unitPrice);
-  const hasAuto = !isNaN(q) && q > 0 && !isNaN(p);
-  if (hasAuto) {
-    const val = Math.round(q * p * 100) / 100;
-    return `<div class="px-1 py-0.5 font-bold text-emerald-700 whitespace-nowrap">${ctFormatEur(val)}</div>`;
-  }
-  return `<input type="text" inputmode="decimal" id="ct-m-total-${idx}" value="${ctEscapeAttr(row.total)}" placeholder="0,00"
+  return `<input type="text" inputmode="text" id="ct-m-total-${idx}" value="${ctEscapeAttr(row.total)}" placeholder="0,00"
     oninput="onCosmoterraManualField(${idx}, 'total', this.value)"
+    onblur="onCosmoterraManualTotalBlur(${idx})"
     ondblclick="openCosmoterraGiftPopover(event, 'manual', ${idx})"
     onkeydown="handleCosmoterraManualKeydown(event, ${idx})"
-    class="w-20 px-1 py-0.5 text-right font-bold text-[11px] border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />`;
+    class="${getManualTotalInputClass(row.total)}" />`;
 }
 
 function renderCosmoterraTables() {
@@ -546,6 +573,7 @@ function startEditCosmoterraPrice(key) {
         item.isAction = Math.abs(item.unitPrice - item.defaultPrice) > 0.001;
       }
     }
+    cell.innerHTML = '';
     updatePreprintedRowVisual(key);
     recalcCosmoterraTotals();
   };
@@ -567,25 +595,179 @@ function startEditCosmoterraPrice(key) {
   input.select();
 }
 
-// ==================== MANUAL ROW INTERACTIONS ====================
+// ==================== MANUAL ROW & WERTMARKEN INTERACTIONS ====================
+function isManualRowUsed(row) {
+  if (!row) return false;
+  return Boolean(
+    (row.nr || '').trim() ||
+    (row.name || '').trim() ||
+    (row.ust || '').trim() ||
+    String(row.qty || '').trim() ||
+    String(row.unitPrice || '').trim() ||
+    String(row.total || '').trim() ||
+    row.isAction ||
+    row.isGift
+  );
+}
+
+function computeTotalWertmarken() {
+  let totalWm = 0;
+  for (const item of Object.values(ctItemsState)) {
+    if (item.isAction || item.isGift) continue;
+    const q = ctParseNum(item.qty);
+    if (isNaN(q) || q <= 0) continue;
+    totalWm += q * (Number(item.wertmarken) || 0);
+  }
+
+  const wmLookup = (window.COSMOTERRA_CATALOG && window.COSMOTERRA_CATALOG.WERTMARKEN_BY_NR) || {};
+  for (const row of ctManualRows) {
+    if (row.isAutoWertmarken || row.isAction || row.isGift) continue;
+    const nr = (row.nr || '').trim();
+    const wm = nr ? Number(wmLookup[nr] || 0) : 0;
+    if (wm <= 0) continue;
+    const q = ctParseNum(row.qty);
+    if (!isNaN(q) && q > 0) {
+      totalWm += q * wm;
+    }
+  }
+
+  return Math.round(totalWm * 100) / 100;
+}
+
+function syncManualRowDomInPlace(idx) {
+  const row = ctManualRows[idx];
+  const tr = document.getElementById(`ct-manual-row-${idx}`);
+  if (!row || !tr) return;
+
+  tr.classList.toggle('bg-emerald-50/50', Boolean(row.isAutoWertmarken));
+  tr.classList.toggle('hover:bg-emerald-50/70', Boolean(row.isAutoWertmarken));
+  tr.classList.toggle('bg-amber-50/20', !row.isAutoWertmarken);
+  tr.classList.toggle('hover:bg-amber-50/40', !row.isAutoWertmarken);
+
+  const nrEl = document.getElementById(`ct-m-nr-${idx}`);
+  const nameEl = document.getElementById(`ct-m-name-${idx}`);
+  const ustEl = document.getElementById(`ct-m-ust-${idx}`);
+  const qtyEl = document.getElementById(`ct-m-qty-${idx}`);
+  const priceEl = document.getElementById(`ct-m-price-${idx}`);
+  const totalEl = document.getElementById(`ct-m-total-${idx}`);
+
+  if (nrEl && document.activeElement !== nrEl) nrEl.value = row.nr || '';
+  if (nameEl && document.activeElement !== nameEl) {
+    nameEl.value = row.name || '';
+    nameEl.classList.toggle('font-semibold', Boolean(row.isAutoWertmarken));
+    nameEl.classList.toggle('text-emerald-900', Boolean(row.isAutoWertmarken));
+  }
+  if (ustEl && document.activeElement !== ustEl) ustEl.value = row.ust || '';
+  if (qtyEl && document.activeElement !== qtyEl) qtyEl.value = row.qty || '';
+  if (priceEl && document.activeElement !== priceEl) priceEl.value = row.unitPrice || '';
+  if (totalEl && document.activeElement !== totalEl) {
+    totalEl.value = row.total || '';
+    totalEl.className = getManualTotalInputClass(row.total);
+  }
+}
+
+function rerenderAllManualRows() {
+  for (let i = 0; i < ctManualRows.length; i++) {
+    const tr = document.getElementById(`ct-manual-row-${i}`);
+    if (tr) {
+      tr.outerHTML = buildManualRowHtml(i);
+    }
+  }
+}
+
+function syncAutoWertmarkenRow() {
+  const totalWm = computeTotalWertmarken();
+  const existingIdx = ctManualRows.findIndex((r) => r.isAutoWertmarken);
+  const qtyStr = totalWm > 0 ? (Number.isInteger(totalWm) ? String(totalWm) : totalWm.toLocaleString('de-DE')) : '';
+
+  if (totalWm > 0) {
+    if (existingIdx !== -1) {
+      ctManualRows[existingIdx].name = 'Wertmarken';
+      ctManualRows[existingIdx].qty = qtyStr;
+      syncManualRowDomInPlace(existingIdx);
+    } else if (!isManualRowUsed(ctManualRows[0])) {
+      ctManualRows[0] = {
+        ...createEmptyManualRow(),
+        name: 'Wertmarken',
+        qty: qtyStr,
+        isAutoWertmarken: true
+      };
+      syncManualRowDomInPlace(0);
+    } else if (!isManualRowUsed(ctManualRows[ctManualRows.length - 1])) {
+      for (let i = ctManualRows.length - 1; i >= 1; i--) {
+        ctManualRows[i] = ctManualRows[i - 1];
+      }
+      ctManualRows[0] = {
+        ...createEmptyManualRow(),
+        name: 'Wertmarken',
+        qty: qtyStr,
+        isAutoWertmarken: true
+      };
+      rerenderAllManualRows();
+    }
+  } else if (existingIdx !== -1) {
+    ctManualRows[existingIdx] = createEmptyManualRow();
+    syncManualRowDomInPlace(existingIdx);
+  }
+
+  return totalWm;
+}
+
 function onCosmoterraManualField(idx, field, val) {
   const row = ctManualRows[idx];
   if (!row) return;
   row[field] = val;
 
-  if (field === 'qty' || field === 'unitPrice') {
-    const cell = document.getElementById(`ct-m-total-cell-${idx}`);
-    if (cell && !row.isGift) {
-      const activeTotalEl = cell.querySelector('input');
-      const q = ctParseNum(row.qty);
-      const p = ctParseNum(row.unitPrice);
-      const willAuto = !isNaN(q) && q > 0 && !isNaN(p);
-      if (willAuto || !activeTotalEl) {
-        cell.innerHTML = renderManualTotalInnerHtml(idx);
-      }
+  if (field === 'name' && row.isAutoWertmarken && val.trim() !== 'Wertmarken') {
+    row.isAutoWertmarken = false;
+    syncManualRowDomInPlace(idx);
+  }
+
+  if (field === 'total') {
+    row.manualTotalOverride = String(val).trim() !== '';
+    const totalEl = document.getElementById(`ct-m-total-${idx}`);
+    if (totalEl) totalEl.className = getManualTotalInputClass(val);
+  } else if ((field === 'qty' || field === 'unitPrice') && !row.manualTotalOverride && !row.isGift) {
+    const q = ctParseNum(row.qty);
+    const p = ctParseNum(row.unitPrice);
+    if (!isNaN(q) && q > 0 && !isNaN(p)) {
+      row.total = ctFormatEur(Math.round(q * p * 100) / 100);
+    } else {
+      row.total = '';
+    }
+    const totalEl = document.getElementById(`ct-m-total-${idx}`);
+    if (totalEl && document.activeElement !== totalEl) {
+      totalEl.value = row.total;
+      totalEl.className = getManualTotalInputClass(row.total);
     }
   }
+
   recalcCosmoterraTotals();
+}
+
+function onCosmoterraManualPriceBlur(idx) {
+  const row = ctManualRows[idx];
+  if (!row) return;
+  const parsed = ctParseNum(row.unitPrice);
+  if (!isNaN(parsed)) {
+    row.unitPrice = ctFormatEur(Math.round(parsed * 100) / 100);
+    const el = document.getElementById(`ct-m-price-${idx}`);
+    if (el) el.value = row.unitPrice;
+  }
+}
+
+function onCosmoterraManualTotalBlur(idx) {
+  const row = ctManualRows[idx];
+  if (!row) return;
+  const parsed = ctParseNum(row.total);
+  if (!isNaN(parsed)) {
+    row.total = ctFormatEur(Math.round(parsed * 100) / 100);
+    const el = document.getElementById(`ct-m-total-${idx}`);
+    if (el) {
+      el.value = row.total;
+      el.className = getManualTotalInputClass(row.total);
+    }
+  }
 }
 
 function handleCosmoterraManualKeydown(event, idx) {
@@ -696,6 +878,8 @@ document.addEventListener('keydown', (e) => {
 
 // ==================== TOTALS & PAYLOAD COLLECTION ====================
 function recalcCosmoterraTotals() {
+  const totalWm = syncAutoWertmarkenRow();
+
   let grandTotal = 0;
   let count = 0;
   let anyGift = false;
@@ -726,16 +910,30 @@ function recalcCosmoterraTotals() {
     if (!hasContent) continue;
 
     count++;
+    let rowTotal = null;
     if (row.isGift) {
       anyGift = true;
+    } else if (row.manualTotalOverride && !isNaN(mTotal)) {
+      rowTotal = Math.round(mTotal * 100) / 100;
     } else if (!isNaN(q) && q > 0 && !isNaN(p)) {
-      grandTotal += Math.round(q * p * 100) / 100;
+      rowTotal = Math.round(q * p * 100) / 100;
     } else if (!isNaN(mTotal)) {
-      grandTotal += Math.round(mTotal * 100) / 100;
+      rowTotal = Math.round(mTotal * 100) / 100;
+    }
+
+    if (rowTotal !== null) {
+      grandTotal += rowTotal;
     }
 
     const baseName = name || (nr ? `Art. ${nr}` : 'Freie Position');
-    let label = !isNaN(q) && q > 0 ? `${q}x ${baseName}` : baseName;
+    let label;
+    if (baseName.toLowerCase() === 'wertmarken' && !isNaN(q) && q > 0 && isNaN(p) && isNaN(mTotal)) {
+      label = `Wertmarken: ${q}`;
+    } else if (rowTotal !== null && rowTotal < 0) {
+      label = `${baseName} (-${ctFormatGermanDecimal(Math.abs(rowTotal))} €)`;
+    } else {
+      label = !isNaN(q) && q > 0 ? `${q}x ${baseName}` : baseName;
+    }
     if (row.isAction) label += ' (A)';
     if (row.isGift) label += ' (Geschenk)';
     descParts.push(label);
@@ -745,14 +943,15 @@ function recalcCosmoterraTotals() {
 
   document.getElementById('ct-gift-footer-row').classList.toggle('hidden', !anyGift);
   document.getElementById('ct-grand-total-cell').textContent = ctFormatEur(grandTotal);
+  const wmBadge = totalWm > 0 ? ` • 🎫 ${totalWm} Wertmarken` : '';
   document.getElementById('ct-live-summary').textContent =
-    `${count} ${count === 1 ? 'Position' : 'Positionen'} • Gesamt: ${ctFormatEur(grandTotal)}`;
+    `${count} ${count === 1 ? 'Position' : 'Positionen'} • Gesamt: ${ctFormatEur(grandTotal)}${wmBadge}`;
 
   if (!ctDescManuallyEdited) {
     document.getElementById('ct-inv-desc').value = descParts.join(', ');
   }
 
-  return { grandTotal, count, anyGift, autoDescription: descParts.join(', ') };
+  return { grandTotal, count, anyGift, totalWm, autoDescription: descParts.join(', ') };
 }
 
 function collectCosmoterraPayload() {
@@ -777,13 +976,15 @@ function collectCosmoterraPayload() {
     const q = ctParseNum(row.qty);
     const p = ctParseNum(row.unitPrice);
     const t = ctParseNum(row.total);
+    const hasAutoTotal = !isNaN(q) && q > 0 && !isNaN(p);
+    const useExplicitTotal = !row.isGift && (row.manualTotalOverride || !hasAutoTotal) && !isNaN(t);
     return {
       nr: (row.nr || '').trim(),
       name: (row.name || '').trim(),
       ust: (row.ust || '').trim(),
       qty: !isNaN(q) && q > 0 ? q : 0,
       unitPrice: !isNaN(p) ? Math.round(p * 100) / 100 : null,
-      total: !isNaN(t) ? Math.round(t * 100) / 100 : null,
+      total: useExplicitTotal ? Math.round(t * 100) / 100 : null,
       isAction: Boolean(row.isAction),
       isGift: Boolean(row.isGift)
     };

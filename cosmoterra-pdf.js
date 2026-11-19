@@ -79,9 +79,35 @@ function ox(x) {
   return x - X_OFFSET;
 }
 
+function parseNumeric(val) {
+  if (typeof val === 'number') return Number.isFinite(val) ? val : NaN;
+  if (val === null || val === undefined) return NaN;
+  let s = String(val).trim().replace(/[€\s]/g, '');
+  if (!s) return NaN;
+  s = s.replace(/,\s*[-–—]+$/, '');
+  if (!s) return NaN;
+  if (s.includes(',') && s.includes('.')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function formatGermanDecimal(absNum) {
+  const fixed = absNum.toFixed(2);
+  const [intPart, decPart] = fixed.split('.');
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${withThousands},${decPart}`;
+}
+
 function formatEur(val) {
   const num = Math.round((Number(val) || 0) * 100) / 100;
-  return `€ ${num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (num < 0) {
+    return `- € ${formatGermanDecimal(Math.abs(num))}`;
+  }
+  return `€ ${formatGermanDecimal(num)}`;
 }
 
 function formatDateDE(isoDate) {
@@ -416,11 +442,19 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
     const nr = (row.nr || '').trim();
     const name = (row.name || '').trim();
     const ust = (row.ust || '').trim();
-    const qty = Math.max(0, Number(row.qty) || 0);
-    const hasUnitPrice = row.unitPrice !== undefined && row.unitPrice !== null && String(row.unitPrice).trim() !== '';
-    const unitPrice = hasUnitPrice ? Math.max(0, Number(row.unitPrice) || 0) : null;
-    const hasManualTotal = row.total !== undefined && row.total !== null && String(row.total).trim() !== '';
-    const manualTotalVal = hasManualTotal ? Math.max(0, Number(row.total) || 0) : null;
+    const parsedQty = parseNumeric(row.qty);
+    const qty = Number.isFinite(parsedQty) ? Math.max(0, parsedQty) : 0;
+
+    const rawUnitPriceStr = row.unitPrice !== undefined && row.unitPrice !== null ? String(row.unitPrice).trim() : '';
+    const parsedUnitPrice = rawUnitPriceStr !== '' ? parseNumeric(rawUnitPriceStr) : NaN;
+    const hasUnitPrice = Number.isFinite(parsedUnitPrice);
+    const unitPrice = hasUnitPrice ? parsedUnitPrice : null;
+
+    const rawTotalStr = row.total !== undefined && row.total !== null ? String(row.total).trim() : '';
+    const parsedTotal = rawTotalStr !== '' ? parseNumeric(rawTotalStr) : NaN;
+    const hasManualTotal = Number.isFinite(parsedTotal);
+    const manualTotalVal = hasManualTotal ? parsedTotal : null;
+
     const isAction = Boolean(row.isAction);
     const isGift = Boolean(row.isGift);
 
@@ -526,10 +560,10 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
       drawGiftCell(page, ox(COLS.right.totalCenter), bottomY, textY, fontBold);
     } else {
       let rowTotal = null;
-      if (qty > 0 && hasUnitPrice) {
-        rowTotal = Math.round(qty * unitPrice * 100) / 100;
-      } else if (hasManualTotal) {
+      if (hasManualTotal) {
         rowTotal = Math.round(manualTotalVal * 100) / 100;
+      } else if (qty > 0 && hasUnitPrice) {
+        rowTotal = Math.round(qty * unitPrice * 100) / 100;
       }
 
       if (rowTotal !== null) {
@@ -537,7 +571,7 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
         drawFittedText(page, formatEur(rowTotal), {
           x: ox(COLS.right.totalRight),
           y: textY,
-          maxWidth: 35,
+          maxWidth: 35.5,
           font: fontBold,
           baseSize: 7.3,
           minSize: 5.5,
@@ -582,5 +616,7 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
 }
 
 module.exports = {
-  generateCosmoterraPdf
+  generateCosmoterraPdf,
+  parseNumeric,
+  formatGermanDecimal
 };

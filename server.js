@@ -4,7 +4,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const { DatabaseSync } = require('node:sqlite');
-const { generateCosmoterraPdf } = require('./cosmoterra-pdf');
+const { generateCosmoterraPdf, parseNumeric, formatGermanDecimal } = require('./cosmoterra-pdf');
 const cosmoterraCatalog = require('./public/cosmoterra-catalog');
 
 const app = express();
@@ -404,27 +404,46 @@ function computeCosmoterraSummary(payload = {}) {
 
     const nr = (row.nr || '').trim();
     const name = (row.name || '').trim();
-    const qty = Math.max(0, Number(row.qty) || 0);
-    const hasUnitPrice = row.unitPrice !== undefined && row.unitPrice !== null && String(row.unitPrice).trim() !== '';
-    const unitPrice = hasUnitPrice ? Math.max(0, Number(row.unitPrice) || 0) : null;
-    const hasManualTotal = row.total !== undefined && row.total !== null && String(row.total).trim() !== '';
-    const manualTotalVal = hasManualTotal ? Math.max(0, Number(row.total) || 0) : null;
+    const parsedQty = parseNumeric(row.qty);
+    const qty = Number.isFinite(parsedQty) ? Math.max(0, parsedQty) : 0;
+
+    const rawUnitPriceStr = row.unitPrice !== undefined && row.unitPrice !== null ? String(row.unitPrice).trim() : '';
+    const parsedUnitPrice = rawUnitPriceStr !== '' ? parseNumeric(rawUnitPriceStr) : NaN;
+    const hasUnitPrice = Number.isFinite(parsedUnitPrice);
+    const unitPrice = hasUnitPrice ? parsedUnitPrice : null;
+
+    const rawTotalStr = row.total !== undefined && row.total !== null ? String(row.total).trim() : '';
+    const parsedTotal = rawTotalStr !== '' ? parseNumeric(rawTotalStr) : NaN;
+    const hasManualTotal = Number.isFinite(parsedTotal);
+    const manualTotalVal = hasManualTotal ? parsedTotal : null;
+
     const isAction = Boolean(row.isAction);
     const isGift = Boolean(row.isGift);
 
     if (!nr && !name && qty <= 0 && !hasUnitPrice && !hasManualTotal && !isGift) continue;
     itemCount++;
 
+    let rowTotal = null;
     if (!isGift) {
-      if (qty > 0 && hasUnitPrice) {
-        grandTotal += Math.round(qty * unitPrice * 100) / 100;
-      } else if (hasManualTotal) {
-        grandTotal += Math.round(manualTotalVal * 100) / 100;
+      if (hasManualTotal) {
+        rowTotal = Math.round(manualTotalVal * 100) / 100;
+      } else if (qty > 0 && hasUnitPrice) {
+        rowTotal = Math.round(qty * unitPrice * 100) / 100;
+      }
+      if (rowTotal !== null) {
+        grandTotal += rowTotal;
       }
     }
 
     const baseName = name || (nr ? `Art. ${nr}` : 'Freie Position');
-    let label = qty > 0 ? `${qty}x ${baseName}` : baseName;
+    let label;
+    if (baseName.toLowerCase() === 'wertmarken' && qty > 0 && !hasUnitPrice && !hasManualTotal) {
+      label = `Wertmarken: ${qty}`;
+    } else if (rowTotal !== null && rowTotal < 0) {
+      label = `${baseName} (-${formatGermanDecimal(Math.abs(rowTotal))} €)`;
+    } else {
+      label = qty > 0 ? `${qty}x ${baseName}` : baseName;
+    }
     if (isAction) label += ' (A)';
     if (isGift) label += ' (Geschenk)';
     descParts.push(label);
