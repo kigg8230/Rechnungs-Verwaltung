@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rechnungs-log-v8';
+const CACHE_NAME = 'rechnungs-log-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
