@@ -196,6 +196,27 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
   const fontRegular = await outDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await outDoc.embedFont(StandardFonts.HelveticaBold);
 
+  const effective = catalog.getEffectiveCatalog(settings);
+
+  // Replace top-left "Stand 01/2027" when active price stand differs from printed PDF template
+  if (effective.priceStand !== catalog.TEMPLATE_PRICE_STAND) {
+    page.drawRectangle({
+      x: ox(90.5),
+      y: 817.5,
+      width: 52,
+      height: 9.5,
+      color: rgb(1, 1, 1)
+    });
+    drawFittedText(page, `Stand ${effective.priceStand}`, {
+      x: ox(92.126),
+      y: 819.8,
+      maxWidth: 48,
+      font: fontRegular,
+      baseSize: 6.0,
+      minSize: 5.0
+    });
+  }
+
   const invoiceNumber = payload.invoice_number || '';
   const customerName = payload.customer_name || '';
   const customerAddress = payload.customer_address || '';
@@ -317,23 +338,22 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
     minSize: 7.0
   });
 
-  // Lookup tables for catalog validation
-  const catalogByKey = new Map();
-  for (const p of [...catalog.LEFT_PRODUCTS, ...catalog.RIGHT_PRODUCTS]) {
-    catalogByKey.set(`${p.side}:${p.rowIndex}`, p);
+  // Lookup submitted items by "side:rowIndex"
+  const submittedByKey = new Map();
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  for (const item of items) {
+    const side = item.side === 'right' ? 'right' : 'left';
+    const rowIndex = Number(item.rowIndex);
+    submittedByKey.set(`${side}:${rowIndex}`, item);
   }
 
   let anyGift = false;
   let grandTotal = 0;
 
-  // Render preprinted product rows
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  for (const item of items) {
-    const side = item.side === 'right' ? 'right' : 'left';
-    const rowIndex = Number(item.rowIndex);
-    const catItem = catalogByKey.get(`${side}:${rowIndex}`);
-    if (!catItem) continue;
-
+  // Iterate over ALL 90 preprinted product rows so active catalog prices (e.g. Stand 11/2026) replace printed 01/2027 template prices even when qty = 0
+  for (const catItem of [...effective.leftProducts, ...effective.rightProducts]) {
+    const side = catItem.side;
+    const rowIndex = catItem.rowIndex;
     const yArr = side === 'left' ? catalog.LEFT_Y : catalog.RIGHT_Y;
     const bottomY = yArr[rowIndex];
     if (bottomY === undefined) continue;
@@ -341,14 +361,21 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
     const col = COLS[side];
     const textY = bottomY + 3.6;
 
-    const qty = Math.max(0, Number(item.qty) || 0);
-    const unitPrice =
-      item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== ''
-        ? Math.max(0, Number(item.unitPrice) || 0)
-        : catItem.price;
-    const priceChanged = Math.abs(unitPrice - catItem.price) > 0.001;
-    const isAction = Boolean(item.isAction) || priceChanged;
-    const isGift = Boolean(item.isGift) && qty > 0;
+    const submitted = submittedByKey.get(`${side}:${rowIndex}`);
+    const qty = submitted ? Math.max(0, Number(submitted.qty) || 0) : 0;
+    const activeCatalogPrice = catItem.price;
+    const templatePrice = catItem.templatePrice !== undefined ? catItem.templatePrice : catItem.price;
+
+    const effectiveUnitPrice =
+      submitted && submitted.unitPrice !== undefined && submitted.unitPrice !== null && submitted.unitPrice !== ''
+        ? Math.max(0, Number(submitted.unitPrice) || 0)
+        : activeCatalogPrice;
+
+    const isAction = submitted
+      ? Boolean(submitted.isAction) || Math.abs(effectiveUnitPrice - activeCatalogPrice) > 0.001
+      : false;
+    const isGift = submitted ? Boolean(submitted.isGift) && qty > 0 : false;
+    const differsFromTemplate = Math.abs(effectiveUnitPrice - templatePrice) > 0.001;
 
     if (isAction) {
       // Narrow white badge behind 'A' so it stays crisp without clipping long product names
@@ -371,7 +398,7 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
       });
     }
 
-    if (priceChanged) {
+    if (differsFromTemplate) {
       page.drawRectangle({
         x: ox(col.priceBoxX),
         y: bottomY + 0.8,
@@ -379,7 +406,7 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
         height: 11.4,
         color: rgb(1, 1, 1)
       });
-      drawFittedText(page, formatEur(unitPrice), {
+      drawFittedText(page, formatEur(effectiveUnitPrice), {
         x: ox(col.priceRight),
         y: textY,
         maxWidth: 31,
@@ -418,7 +445,7 @@ async function generateCosmoterraPdf(payload, settings = {}, uploadsDir = '') {
         anyGift = true;
         drawGiftCell(page, ox(col.totalCenter), bottomY, textY, fontBold);
       } else {
-        const lineTotal = Math.round(qty * unitPrice * 100) / 100;
+        const lineTotal = Math.round(qty * effectiveUnitPrice * 100) / 100;
         grandTotal += lineTotal;
         drawFittedText(page, formatEur(lineTotal), {
           x: ox(col.totalRight),

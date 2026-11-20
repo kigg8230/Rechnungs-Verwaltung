@@ -1,0 +1,730 @@
+[
+  {
+    "art_nr": "100120",
+    "name": "ANTIOXIDANTIEN (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 40,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "100131",
+    "name": "BODY BASIC IMMUN Orales Pulver (360 g)",
+    "wertmarken": 3,
+    "einheit": "360 g",
+    "preis_brutto": 49.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "100132",
+    "name": "BODY BASIC IMMUN Kapseln (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 47,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "100140",
+    "name": "BODY BASIC REGENERATION Orales Pulver (360 g)",
+    "wertmarken": 2,
+    "einheit": "360 g",
+    "preis_brutto": 45,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "100141",
+    "name": "BODY BASIC REGENERATION Kapseln (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 37,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "100145",
+    "name": "KOLLAGEN PLUS Orales Pulver (180 g)",
+    "wertmarken": 3,
+    "einheit": "180 g",
+    "preis_brutto": 54,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "100150",
+    "name": "ANTISTRESS Orales Pulver (360 g)",
+    "wertmarken": 2,
+    "einheit": "360 g",
+    "preis_brutto": 45,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "100151",
+    "name": "BODY BASIC OMEGA+ Saft (500 ml)",
+    "wertmarken": 2,
+    "einheit": "500 ml",
+    "preis_brutto": 39.5,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "100160",
+    "name": "ALLERGO-STOP (60 Kps.)",
+    "wertmarken": 2,
+    "einheit": "60 Kps.",
+    "preis_brutto": 31,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "100240",
+    "name": "BASENFIT Kapseln (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 35,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "100350",
+    "name": "OSSPURA Orales Pulver (500 g)",
+    "wertmarken": 3,
+    "einheit": "500 g",
+    "preis_brutto": 54,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "100370",
+    "name": "BITTER PLUS (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 44,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "100380",
+    "name": "GLUTAMIN PLUS Orales Pulver (210 g)",
+    "wertmarken": 3,
+    "einheit": "210 g",
+    "preis_brutto": 62,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "100390",
+    "name": "PROBIO PLUS (120 Kps.)",
+    "wertmarken": 5,
+    "einheit": "120 Kps.",
+    "preis_brutto": 89,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "100416",
+    "name": "BASENFIT BAD (416 g)",
+    "wertmarken": 2,
+    "einheit": "416 g",
+    "preis_brutto": 32,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "100450",
+    "name": "OSSPURA MILD Orales Pulver (500 g)",
+    "wertmarken": 3,
+    "einheit": "500 g",
+    "preis_brutto": 53.5,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "100480",
+    "name": "BASENFIT Orales Pulver (240 g)",
+    "wertmarken": 3,
+    "einheit": "240 g",
+    "preis_brutto": 56,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "100700",
+    "name": "PANMOL VITAL BOOST (80 g)",
+    "wertmarken": 2,
+    "einheit": "80 g",
+    "preis_brutto": 39,
+    "kategorie": "Ernährungs-Alltag"
+  },
+  {
+    "art_nr": "110060",
+    "name": "NADH PLUS (60 Kps.)",
+    "wertmarken": 3,
+    "einheit": "60 Kps.",
+    "preis_brutto": 59,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "110318",
+    "name": "ARTISCHOCKEN PLUS (180 Kps.)",
+    "wertmarken": 2,
+    "einheit": "180 Kps.",
+    "preis_brutto": 44,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "110518",
+    "name": "GELENK AKTIV (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 61,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "110620",
+    "name": "SEHKRAFT (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 53.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "110706",
+    "name": "GLUCO STABIL (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 51.5,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "111212",
+    "name": "COENZYM Q10 PLUS (120 Kps.)",
+    "wertmarken": 4,
+    "einheit": "120 Kps.",
+    "preis_brutto": 75,
+    "kategorie": "Herz, Kreislauf und Gefäße"
+  },
+  {
+    "art_nr": "111220",
+    "name": "COENZYM Q10 PLUS (225 Kps.)",
+    "wertmarken": 5,
+    "einheit": "225 Kps.",
+    "preis_brutto": 130,
+    "kategorie": "Herz, Kreislauf und Gefäße"
+  },
+  {
+    "art_nr": "111330",
+    "name": "CURCUMIN PLUS (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 51,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "120180",
+    "name": "ZINK PLUS (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 46,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "120212",
+    "name": "MAGNESIUM PLUS (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 38,
+    "kategorie": "Herz, Kreislauf und Gefäße"
+  },
+  {
+    "art_nr": "120240",
+    "name": "WEIHRAUCH PLUS (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 42,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "120312",
+    "name": "HAAR VITAL (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 39,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "120320",
+    "name": "SENSITIV (60 Kps.)",
+    "wertmarken": 2,
+    "einheit": "60 Kps.",
+    "preis_brutto": 32,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "120400",
+    "name": "FASZIEN-DETOX Orales Pulver (243 g)",
+    "wertmarken": 3,
+    "einheit": "243 g",
+    "preis_brutto": 52,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "120500",
+    "name": "FASZIEN-DETOX Kapseln (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 41.5,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "130112",
+    "name": "SELEN PLUS Kapseln (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 59.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "130280",
+    "name": "ACEROLA PLUS (120 Ktbl.)",
+    "wertmarken": 1,
+    "einheit": "120 Ktbl.",
+    "preis_brutto": 27.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "130350",
+    "name": "KINDERFIT Saft (500 ml)",
+    "wertmarken": 1,
+    "einheit": "500 ml",
+    "preis_brutto": 22,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "130360",
+    "name": "DENK AKTIV Saft (500 ml)",
+    "wertmarken": 2,
+    "einheit": "500 ml",
+    "preis_brutto": 32,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "130520",
+    "name": "SONNENKRAFT (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 49.5,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "130600",
+    "name": "LECITHIN PLUS Orales Pulver (300 g)",
+    "wertmarken": 3,
+    "einheit": "300 g",
+    "preis_brutto": 59,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "130612",
+    "name": "B-KOMPLEX PLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 49,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "140120",
+    "name": "VENEN AKTIV (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 41,
+    "kategorie": "Venen"
+  },
+  {
+    "art_nr": "140225",
+    "name": "QUENDEL Kräutersaft (250 ml)",
+    "wertmarken": 1,
+    "einheit": "250 ml",
+    "preis_brutto": 15,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "140350",
+    "name": "FICHTENNADEL Kräutersaft (250 ml)",
+    "wertmarken": 1,
+    "einheit": "250 ml",
+    "preis_brutto": 16.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "140512",
+    "name": "STIMMUNGSPLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 50,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "140612",
+    "name": "HOPFEN-HAFER PLUS (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 44,
+    "kategorie": "Nervensystem"
+  },
+  {
+    "art_nr": "140650",
+    "name": "LEBENSKRAFT Elixier (500 ml)",
+    "wertmarken": 1,
+    "einheit": "500 ml",
+    "preis_brutto": 21,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "140800",
+    "name": "ALOE VERA SAFT (1000 ml)",
+    "wertmarken": 2,
+    "einheit": "1000 ml",
+    "preis_brutto": 31,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "150061",
+    "name": "OMEGA 3 PLUS (60 Kps.)",
+    "wertmarken": 3,
+    "einheit": "60 Kps.",
+    "preis_brutto": 52,
+    "kategorie": "Herz, Kreislauf und Gefäße"
+  },
+  {
+    "art_nr": "150071",
+    "name": "OMEGA 3 PLUS (120 Kps.)",
+    "wertmarken": 5,
+    "einheit": "120 Kps.",
+    "preis_brutto": 99,
+    "kategorie": "Herz, Kreislauf und Gefäße"
+  },
+  {
+    "art_nr": "150120",
+    "name": "NATURO (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 62,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "150150",
+    "name": "FOLAT PLUS (60 Kps.)",
+    "wertmarken": 2,
+    "einheit": "60 Kps.",
+    "preis_brutto": 30,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "150240",
+    "name": "ARGININ PLUS (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 50,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "160112",
+    "name": "GELEE ROYALE PLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 63,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "160130",
+    "name": "VITAMIN C PLUS (180 Kps.)",
+    "wertmarken": 3,
+    "einheit": "180 Kps.",
+    "preis_brutto": 49,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "160220",
+    "name": "VITAMIN E PLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 62,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "170112",
+    "name": "ROTKLEE PLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 56,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "170120",
+    "name": "YAMSWURZEL PLUS (120 Kps.)",
+    "wertmarken": 3,
+    "einheit": "120 Kps.",
+    "preis_brutto": 51.5,
+    "kategorie": "Hormonsystem und Fortpflanzung"
+  },
+  {
+    "art_nr": "180124",
+    "name": "PROPOLIS PLUS (180 Kps.)",
+    "wertmarken": 2,
+    "einheit": "180 Kps.",
+    "preis_brutto": 44,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "190151",
+    "name": "BODY BASIC ENERGIE Orales Pulver (360 g)",
+    "wertmarken": 2,
+    "einheit": "360 g",
+    "preis_brutto": 43,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "190152",
+    "name": "BODY BASIC ENERGIE Kapseln (120 Kps.)",
+    "wertmarken": 2,
+    "einheit": "120 Kps.",
+    "preis_brutto": 40.5,
+    "kategorie": "Stoffwechsel und Energie"
+  },
+  {
+    "art_nr": "190201",
+    "name": "POWERSPORTS RELOAD Orales Pulver Dose (600 g)",
+    "wertmarken": 3,
+    "einheit": "600 g",
+    "preis_brutto": 54,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "190251",
+    "name": "POWERSPORTS RELOAD Sachets (30 Sachets)",
+    "wertmarken": 2,
+    "einheit": "30 Sachets",
+    "preis_brutto": 36,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "250218",
+    "name": "BEIN- UND FUSS-SPRAY (100 ml)",
+    "wertmarken": 1,
+    "einheit": "100 ml",
+    "preis_brutto": 18,
+    "kategorie": "Venen"
+  },
+  {
+    "art_nr": "250320",
+    "name": "HOLZKNECHT MASSAGE BALSAM (200 ml)",
+    "wertmarken": 2,
+    "einheit": "200 ml",
+    "preis_brutto": 34,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "250410",
+    "name": "HANDCREME MIT SALBEI (100 ml)",
+    "wertmarken": 1,
+    "einheit": "100 ml",
+    "preis_brutto": 13,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "250507",
+    "name": "HORNHAUT CREME (100 ml)",
+    "wertmarken": 1,
+    "einheit": "100 ml",
+    "preis_brutto": 20,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "250510",
+    "name": "WEIHRAUCH CREME (100 ml)",
+    "wertmarken": 1,
+    "einheit": "100 ml",
+    "preis_brutto": 24,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "250520",
+    "name": "WEIHRAUCH CREME (200 ml)",
+    "wertmarken": 2,
+    "einheit": "200 ml",
+    "preis_brutto": 42,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "250530",
+    "name": "WEIHRAUCH CREME (500 ml)",
+    "wertmarken": 5,
+    "einheit": "500 ml",
+    "preis_brutto": 99,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "250610",
+    "name": "ECTOSAN ZELLSCHUTZ (100 ml)",
+    "wertmarken": 2,
+    "einheit": "100 ml",
+    "preis_brutto": 31,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "250640",
+    "name": "ECTOSAN SONNENSCHUTZ (100 ml)",
+    "wertmarken": 2,
+    "einheit": "100 ml",
+    "preis_brutto": 35,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "250700",
+    "name": "CISTROSA LIPPENPFLEGE (1 Stk.)",
+    "wertmarken": 0,
+    "einheit": "1 Stk.",
+    "preis_brutto": 7,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "250850",
+    "name": "ALOE VERA GEL (150 ml)",
+    "wertmarken": 1,
+    "einheit": "150 ml",
+    "preis_brutto": 22,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "251120",
+    "name": "BUCHWEIZEN ROSSKASTANIEN GEL (200 ml)",
+    "wertmarken": 2,
+    "einheit": "200 ml",
+    "preis_brutto": 29,
+    "kategorie": "Venen"
+  },
+  {
+    "art_nr": "252010",
+    "name": "CISTROSA CREME (100 ml)",
+    "wertmarken": 1,
+    "einheit": "100 ml",
+    "preis_brutto": 26,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "252015",
+    "name": "CISTROSA SHAMPOO (150 ml)",
+    "wertmarken": 1,
+    "einheit": "150 ml",
+    "preis_brutto": 19,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "340112",
+    "name": "CISTROSA KRAUT (125 g)",
+    "wertmarken": 1,
+    "einheit": "125 g",
+    "preis_brutto": 25,
+    "kategorie": "Verdauungssystem"
+  },
+  {
+    "art_nr": "340212",
+    "name": "KAKAO PLUS Orales Pulver (100 g)",
+    "wertmarken": 2,
+    "einheit": "100 g",
+    "preis_brutto": 29.5,
+    "kategorie": "Ernährungs-Alltag"
+  },
+  {
+    "art_nr": "370105",
+    "name": "CISTROSA LIQUID (50 ml)",
+    "wertmarken": 1,
+    "einheit": "50 ml",
+    "preis_brutto": 22,
+    "kategorie": "Haut und Haare"
+  },
+  {
+    "art_nr": "370110",
+    "name": "SELEN PLUS Spray (50 ml)",
+    "wertmarken": 1,
+    "einheit": "50 ml",
+    "preis_brutto": 24.5,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "370120",
+    "name": "VITAMIN D3 Tropfen (20 ml)",
+    "wertmarken": 1,
+    "einheit": "20 ml",
+    "preis_brutto": 14,
+    "kategorie": "Immunsystem"
+  },
+  {
+    "art_nr": "370130",
+    "name": "VITAMIN K2 Tropfen (20 ml)",
+    "wertmarken": 3,
+    "einheit": "20 ml",
+    "preis_brutto": 49,
+    "kategorie": "Sport und Bewegungsapparat"
+  },
+  {
+    "art_nr": "400100",
+    "name": "NERVEN/ STRESS-PROGRAMM",
+    "wertmarken": 5,
+    "einheit": "2 x 120 Kps. / 360 g",
+    "preis_brutto": 175,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400112",
+    "name": "KNOCHEN/ GELENKE-PROGRAMM",
+    "wertmarken": 4,
+    "einheit": "2 x 180 Kps. / 500 g",
+    "preis_brutto": 146,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400161",
+    "name": "BASIS-PROGRAMM",
+    "wertmarken": 4,
+    "einheit": "120 Kps. / 60 Kps. / 240 g",
+    "preis_brutto": 140,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400230",
+    "name": "IMMUN-PROGRAMM",
+    "wertmarken": 5,
+    "einheit": "180 Kps. / 120 Kps. / 60 Kps. / 360 g",
+    "preis_brutto": 168,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400250",
+    "name": "DERMA-PROGRAMM",
+    "wertmarken": 4,
+    "einheit": "2 x 60 Kps. / 240 g",
+    "preis_brutto": 104,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400260",
+    "name": "VENEN-PROGRAMM",
+    "wertmarken": 4,
+    "einheit": "180 Kps. / 120 Kps. / 100 ml / 200 ml",
+    "preis_brutto": 116,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400270",
+    "name": "DARM-START-PROGRAMM",
+    "wertmarken": 5,
+    "einheit": "120 Kps. / 210 g / 300 g",
+    "preis_brutto": 148,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400290",
+    "name": "SCHWANGERSCHAFTS-PROGRAMM",
+    "wertmarken": 4,
+    "einheit": "2 x 60 Kps. / 1 x 120 Kps.",
+    "preis_brutto": 106,
+    "kategorie": "Programme"
+  },
+  {
+    "art_nr": "400800",
+    "name": "ALOE VERA SAFT (3x 1000 ml)",
+    "wertmarken": 5,
+    "einheit": "3000 ml",
+    "preis_brutto": 87,
+    "kategorie": "Verdauungssystem"
+  }
+]

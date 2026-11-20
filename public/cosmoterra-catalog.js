@@ -7,6 +7,9 @@
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  const DEFAULT_PRICE_STAND = '11/2026';
+  const TEMPLATE_PRICE_STAND = '01/2027';
+
   const LEFT_Y = [
     682.51, 669.4, 656.29, 643.18, 630.07, 616.96, 603.84, 590.73, 577.62, 564.51,
     551.4, 538.29, 525.17, 512.06, 498.95, 485.84, 472.73, 459.62, 446.5, 433.39,
@@ -27,6 +30,7 @@
   const GIFT_FOOTER_ROW_INDEX = 48;
   const TOTAL_ROW_INDEX = 49;
 
+  // Base catalog defaults to Stand 11/2026; templatePrice tracks what is preprinted on assets/cosmoterra-vorlage.pdf (Stand 01/2027)
   const LEFT_PRODUCTS = [
     { side: 'left', rowIndex: 0, nr: '130280', name: 'ACEROLA PLUS Kautabletten', ust: '10%', price: 27.5, wertmarken: 1 },
     { side: 'left', rowIndex: 1, nr: '100160', name: 'ALLERGO-STOP Kps.', ust: '10%', price: 31, wertmarken: 2 },
@@ -45,7 +49,7 @@
     { side: 'left', rowIndex: 14, nr: '100370', name: 'BITTER PLUS Kps.', ust: '10%', price: 44, wertmarken: 2 },
     { side: 'left', rowIndex: 15, nr: '190151', name: 'BODY BASIC ENERGIE Plv.', ust: '10%', price: 43, wertmarken: 2 },
     { side: 'left', rowIndex: 16, nr: '190152', name: 'BODY BASIC ENERGIE Kps.', ust: '10%', price: 40.5, wertmarken: 2 },
-    { side: 'left', rowIndex: 17, nr: '100131', name: 'BODY BASIC IMMUN Plv.', ust: '10%', price: 49.5, wertmarken: 3 },
+    { side: 'left', rowIndex: 17, nr: '100131', name: 'BODY BASIC IMMUN Plv.', ust: '10%', price: 47, templatePrice: 49.5, wertmarken: 3 },
     { side: 'left', rowIndex: 18, nr: '100132', name: 'BODY BASIC IMMUN Kps.', ust: '10%', price: 47, wertmarken: 3 },
     { side: 'left', rowIndex: 19, nr: '100151', name: 'BODY BASIC OMEGA+ Saft', ust: '10%', price: 39.5, wertmarken: 2 },
     { side: 'left', rowIndex: 20, nr: '100140', name: 'BODY BASIC REGENERATION Plv.', ust: '10%', price: 45, wertmarken: 2 },
@@ -63,21 +67,21 @@
     { side: 'left', rowIndex: 32, nr: '250610', name: 'ECTOSAN Zellschutz', ust: '20%', price: 31, wertmarken: 2 },
     { side: 'left', rowIndex: 33, nr: '120500', name: 'FASZIEN-DETOX Kps.', ust: '10%', price: 41.5, wertmarken: 2 },
     { side: 'left', rowIndex: 34, nr: '120400', name: 'FASZIEN-DETOX Plv.', ust: '10%', price: 52, wertmarken: 3 },
-    { side: 'left', rowIndex: 35, nr: '140350', name: 'FICHTENNADEL 250 ml', ust: '10%', price: 16.5, wertmarken: 1 },
+    { side: 'left', rowIndex: 35, nr: '140350', name: 'FICHTENNADEL 250 ml', ust: '10%', price: 15, templatePrice: 16.5, wertmarken: 1 },
     { side: 'left', rowIndex: 36, nr: '150150', name: 'FOLAT PLUS Kps.', ust: '10%', price: 30, wertmarken: 2 },
     { side: 'left', rowIndex: 37, nr: '160112', name: 'GELEE ROYALE PLUS Kps.', ust: '10%', price: 63, wertmarken: 3 },
     { side: 'left', rowIndex: 38, nr: '110518', name: 'GELENK AKTIV Kps.', ust: '10%', price: 61, wertmarken: 3 },
-    { side: 'left', rowIndex: 39, nr: '110706', name: 'GLUCO STABIL 120 Kps.', ust: '10%', price: 51.5, wertmarken: 3 },
+    { side: 'left', rowIndex: 39, nr: '110706', name: 'GLUCO STABIL 120 Kps.', ust: '10%', price: 49, templatePrice: 51.5, wertmarken: 3 },
     { side: 'left', rowIndex: 40, nr: '100380', name: 'GLUTAMIN PLUS Plv.', ust: '10%', price: 62, wertmarken: 3 },
     { side: 'left', rowIndex: 41, nr: '120312', name: 'HAAR VITAL Kps.', ust: '10%', price: 39, wertmarken: 2 },
     { side: 'left', rowIndex: 42, nr: '250410', name: 'HANDCREME MIT SALBEI', ust: '20%', price: 13, wertmarken: 1 },
     { side: 'left', rowIndex: 43, nr: '250320', name: 'HOLZKNECHT BALSAM', ust: '20%', price: 34, wertmarken: 2 },
     { side: 'left', rowIndex: 44, nr: '140612', name: 'HOPFEN-HAFER PLUS Kps.', ust: '10%', price: 44, wertmarken: 2 },
     { side: 'left', rowIndex: 45, nr: '250507', name: 'HORNHAUT CREME', ust: '20%', price: 20, wertmarken: 1 },
-    { side: 'left', rowIndex: 46, nr: '130350', name: 'KINDERFIT Saft', ust: '10%', price: 22, wertmarken: 1 },
+    { side: 'left', rowIndex: 46, nr: '130350', name: 'KINDERFIT Saft', ust: '10%', price: 19, templatePrice: 22, wertmarken: 1 },
     { side: 'left', rowIndex: 47, nr: '340212', name: 'KAKAO PLUS Plv.', ust: '10%', price: 29.5, wertmarken: 2, missingEq: true },
     { side: 'left', rowIndex: 48, nr: '100145', name: 'KOLLAGEN PLUS Plv.', ust: '10%', price: 54, wertmarken: 3, missingEq: true },
-    { side: 'left', rowIndex: 49, nr: '140650', name: 'LEBENSKRAFT Elixier', ust: '20%', price: 21, wertmarken: 1 }
+    { side: 'left', rowIndex: 49, nr: '140650', name: 'LEBENSKRAFT Elixier', ust: '20%', price: 19, templatePrice: 21, wertmarken: 1 }
   ];
 
   const RIGHT_PRODUCTS = [
@@ -96,10 +100,10 @@
     { side: 'right', rowIndex: 12, nr: '180124', name: 'PROPOLIS PLUS Kps.', ust: '10%', price: 44, wertmarken: 2 },
     { side: 'right', rowIndex: 13, nr: '140225', name: 'QUENDEL Kräutersaft 250ml', ust: '10%', price: 15, wertmarken: 1 },
     { side: 'right', rowIndex: 14, nr: '170112', name: 'ROTKLEE PLUS Kps.', ust: '10%', price: 56, wertmarken: 3 },
-    { side: 'right', rowIndex: 15, nr: '110620', name: 'SEHKRAFT Kps.', ust: '10%', price: 53.5, wertmarken: 3 },
+    { side: 'right', rowIndex: 15, nr: '110620', name: 'SEHKRAFT Kps.', ust: '10%', price: 52, templatePrice: 53.5, wertmarken: 3 },
     { side: 'right', rowIndex: 16, nr: '130112', name: 'SELEN PLUS Kps.', ust: '10%', price: 59.5, wertmarken: 3 },
-    { side: 'right', rowIndex: 17, nr: '370110', name: 'SELEN PLUS Spray', ust: '10%', price: 24.5, wertmarken: 1 },
-    { side: 'right', rowIndex: 18, nr: '120320', name: 'SENSITIV Kps.', ust: '10%', price: 32, wertmarken: 2 },
+    { side: 'right', rowIndex: 17, nr: '370110', name: 'SELEN PLUS Spray', ust: '10%', price: 21.5, templatePrice: 24.5, wertmarken: 1 },
+    { side: 'right', rowIndex: 18, nr: '120320', name: 'SENSITIV Kps.', ust: '10%', price: 30, templatePrice: 32, wertmarken: 2 },
     { side: 'right', rowIndex: 19, nr: '130520', name: 'SONNENKRAFT Kps.', ust: '10%', price: 49.5, wertmarken: 3 },
     { side: 'right', rowIndex: 20, nr: '140512', name: 'STIMMUNGSPLUS Kps.', ust: '10%', price: 50, wertmarken: 3 },
     { side: 'right', rowIndex: 21, nr: '140120', name: 'VENEN AKTIV Kps.', ust: '10%', price: 41, wertmarken: 2 },
@@ -116,7 +120,7 @@
     // rowIndex 32 is the spacer row on the printed form
     { side: 'right', rowIndex: 33, nr: '400161', name: 'BASIS-Programm', ust: '10%', price: 140, wertmarken: 4 },
     { side: 'right', rowIndex: 34, nr: '400270', name: 'DARM-START-Programm', ust: '10%', price: 148, wertmarken: 5 },
-    { side: 'right', rowIndex: 35, nr: '400250', name: 'DERMA-Programm', ust: '10%', price: 104, wertmarken: 4 },
+    { side: 'right', rowIndex: 35, nr: '400250', name: 'DERMA-Programm', ust: '10%', price: 100, templatePrice: 104, wertmarken: 4 },
     { side: 'right', rowIndex: 36, nr: '400230', name: 'IMMUN-Programm', ust: '10%', price: 168, wertmarken: 5 },
     { side: 'right', rowIndex: 37, nr: '400112', name: 'KNOCHEN/ GELENKE-Progr. MILD', ust: '10%', price: 146, wertmarken: 4 },
     { side: 'right', rowIndex: 38, nr: '400100', name: 'NERVEN/ STRESS-Programm', ust: '10%', price: 175, wertmarken: 5 },
@@ -131,7 +135,59 @@
   for (const p of LEFT_PRODUCTS) WERTMARKEN_BY_NR[p.nr] = p.wertmarken;
   for (const p of RIGHT_PRODUCTS) WERTMARKEN_BY_NR[p.nr] = p.wertmarken;
 
+  function parseOverrides(raw) {
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw;
+    try {
+      const parsed = JSON.parse(String(raw));
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function resolveProductWithOverrides(p, overrides) {
+    const ov = overrides[p.nr] || (p.nr === '120320' ? overrides['120330'] : null);
+    const hasOvPrice = ov && Number.isFinite(Number(ov.price)) && Number(ov.price) >= 0;
+    const hasOvWm = ov && Number.isFinite(Number(ov.wertmarken)) && Number(ov.wertmarken) >= 0;
+    return {
+      ...p,
+      price: hasOvPrice ? Number(ov.price) : p.price,
+      templatePrice: p.templatePrice !== undefined ? p.templatePrice : p.price,
+      wertmarken: hasOvWm ? Number(ov.wertmarken) : p.wertmarken
+    };
+  }
+
+  function getEffectiveCatalog(settings) {
+    const overrides = parseOverrides(settings && settings.cosmoterra_price_overrides);
+    const priceStand =
+      (settings && settings.cosmoterra_price_stand ? String(settings.cosmoterra_price_stand).trim() : '') ||
+      DEFAULT_PRICE_STAND;
+
+    const leftProducts = LEFT_PRODUCTS.map((p) => resolveProductWithOverrides(p, overrides));
+    const rightProducts = RIGHT_PRODUCTS.map((p) => resolveProductWithOverrides(p, overrides));
+
+    const wertmarkenByNr = { ...WERTMARKEN_BY_NR };
+    for (const [nr, ov] of Object.entries(overrides)) {
+      if (ov && Number.isFinite(Number(ov.wertmarken)) && Number(ov.wertmarken) >= 0) {
+        wertmarkenByNr[nr] = Number(ov.wertmarken);
+        if (nr === '120330') wertmarkenByNr['120320'] = Number(ov.wertmarken);
+      }
+    }
+    for (const p of leftProducts) wertmarkenByNr[p.nr] = p.wertmarken;
+    for (const p of rightProducts) wertmarkenByNr[p.nr] = p.wertmarken;
+
+    return {
+      priceStand,
+      leftProducts,
+      rightProducts,
+      wertmarkenByNr
+    };
+  }
+
   return {
+    DEFAULT_PRICE_STAND,
+    TEMPLATE_PRICE_STAND,
     LEFT_Y,
     RIGHT_Y,
     MANUAL_ROW_INDICES,
@@ -139,6 +195,7 @@
     TOTAL_ROW_INDEX,
     LEFT_PRODUCTS,
     RIGHT_PRODUCTS,
-    WERTMARKEN_BY_NR
+    WERTMARKEN_BY_NR,
+    getEffectiveCatalog
   };
 }));

@@ -68,7 +68,9 @@ db.exec(`
     cosmoterra_partner_address TEXT NOT NULL DEFAULT '',
     cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '',
     cosmoterra_partner_image TEXT NOT NULL DEFAULT '',
-    cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}'
+    cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}',
+    cosmoterra_price_stand TEXT NOT NULL DEFAULT '11/2026',
+    cosmoterra_price_overrides TEXT NOT NULL DEFAULT '{}'
   );
 
   INSERT OR IGNORE INTO settings (id, prefix_schema, suffix_schema, number_digits, next_sequence, yearly_reset, last_reset_year)
@@ -145,7 +147,9 @@ const safeSettingsAlterStatements = [
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_address TEXT NOT NULL DEFAULT '';",
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_gp_nr TEXT NOT NULL DEFAULT '';",
   "ALTER TABLE settings ADD COLUMN cosmoterra_partner_image TEXT NOT NULL DEFAULT '';",
-  "ALTER TABLE settings ADD COLUMN cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}';"
+  "ALTER TABLE settings ADD COLUMN cosmoterra_gift_text TEXT NOT NULL DEFAULT 'Geschenk von Herzen von deinem Berater {NAME}';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_price_stand TEXT NOT NULL DEFAULT '11/2026';",
+  "ALTER TABLE settings ADD COLUMN cosmoterra_price_overrides TEXT NOT NULL DEFAULT '{}';"
 ];
 for (const sql of safeSettingsAlterStatements) {
   try {
@@ -361,9 +365,10 @@ function resolveInvoiceNumberAndSequence(settings, invoiceDate, requestedInvoice
   return { nextSeq, invYear, invoiceNumber, usedGeneratedSeq, sequenceNum };
 }
 
-function computeCosmoterraSummary(payload = {}) {
+function computeCosmoterraSummary(payload = {}, settings = {}) {
+  const effective = cosmoterraCatalog.getEffectiveCatalog(settings);
   const catalogByKey = new Map();
-  for (const p of [...cosmoterraCatalog.LEFT_PRODUCTS, ...cosmoterraCatalog.RIGHT_PRODUCTS]) {
+  for (const p of [...effective.leftProducts, ...effective.rightProducts]) {
     catalogByKey.set(`${p.side}:${p.rowIndex}`, p);
   }
 
@@ -561,13 +566,21 @@ app.put('/api/settings', (req, res) => {
     ? String(body.cosmoterra_gift_text).trim()
     : (prev.cosmoterra_gift_text !== undefined ? String(prev.cosmoterra_gift_text).trim() : defaultGiftText);
   const cosmoterra_gift_text = rawGiftText || defaultGiftText;
+  const cosmoterra_price_stand = body.cosmoterra_price_stand !== undefined
+    ? (String(body.cosmoterra_price_stand).trim() || '11/2026')
+    : (prev.cosmoterra_price_stand || '11/2026');
+  const cosmoterra_price_overrides = body.cosmoterra_price_overrides !== undefined
+    ? (typeof body.cosmoterra_price_overrides === 'string'
+        ? body.cosmoterra_price_overrides
+        : JSON.stringify(body.cosmoterra_price_overrides || {}))
+    : (prev.cosmoterra_price_overrides || '{}');
 
   const currentYear = new Date().getFullYear();
   db.prepare(`
     UPDATE settings
     SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
         cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?,
-        cosmoterra_gift_text = ?
+        cosmoterra_gift_text = ?, cosmoterra_price_stand = ?, cosmoterra_price_overrides = ?
     WHERE id = 1
   `).run(
     prefix_schema,
@@ -582,7 +595,9 @@ app.put('/api/settings', (req, res) => {
     cosmoterra_partner_name,
     cosmoterra_partner_address,
     cosmoterra_partner_gp_nr,
-    cosmoterra_gift_text
+    cosmoterra_gift_text,
+    cosmoterra_price_stand,
+    cosmoterra_price_overrides
   );
 
   const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
@@ -948,6 +963,156 @@ app.post('/api/invoices', upload.single('pdf'), (req, res) => {
 
 // ==================== COSMOTERRA DIGITAL INVOICE API ====================
 
+app.get('/api/cosmoterra/price-list/:version', (req, res) => {
+  const version = String(req.params.version || '').trim();
+  const base11Path = path.join(__dirname, 'assets', 'cosmoterra_produkte_11-2026.json');
+  const file01Path = path.join(__dirname, 'assets', 'cosmoterra_produkte_01-2027.json');
+
+  if (version === '01-2027' || version === '11-2026') {
+    const filePath = version === '01-2027' ? file01Path : base11Path;
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Preislisten-Datei im Repository nicht gefunden.' });
+    }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="cosmoterra_produkte_${version}.json"`);
+    return res.send(fs.readFileSync(filePath));
+  }
+
+  if (version === 'current') {
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    const effective = cosmoterraCatalog.getEffectiveCatalog(settings);
+    const standSlug = effective.priceStand.replace(/[^0-9a-zA-Z_-]+/g, '-');
+    let baseList = [];
+    if (fs.existsSync(base11Path)) {
+      baseList = JSON.parse(fs.readFileSync(base11Path, 'utf8'));
+    }
+
+    let overrides = {};
+    try {
+      overrides = JSON.parse(settings.cosmoterra_price_overrides || '{}') || {};
+    } catch {
+      overrides = {};
+    }
+
+    const activeByNr = new Map();
+    for (const p of [...effective.leftProducts, ...effective.rightProducts]) {
+      activeByNr.set(p.nr, p);
+      if (p.nr === '120320') activeByNr.set('120330', p);
+    }
+
+    const exported = baseList.map((item) => {
+      const nr = String(item.art_nr);
+      const ov = overrides[nr] || (nr === '120330' ? overrides['120320'] : null);
+      const active = activeByNr.get(nr);
+      const nextNr = nr === '120330' && overrides['120320'] ? '120320' : item.art_nr;
+      const nextPrice = ov && Number.isFinite(Number(ov.price))
+        ? Number(ov.price)
+        : (active ? active.price : item.preis_brutto);
+      const nextWm = ov && Number.isFinite(Number(ov.wertmarken))
+        ? Number(ov.wertmarken)
+        : (active ? active.wertmarken : item.wertmarken);
+
+      return {
+        art_nr: nextNr,
+        name: item.name,
+        wertmarken: nextWm,
+        einheit: item.einheit,
+        preis_brutto: nextPrice,
+        kategorie: item.kategorie
+      };
+    });
+
+    exported.sort((a, b) => String(a.art_nr).localeCompare(String(b.art_nr)));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="cosmoterra_produkte_${standSlug}.json"`);
+    return res.send(JSON.stringify(exported, null, 2));
+  }
+
+  return res.status(400).json({ error: 'Unbekannte Preislisten-Version.' });
+});
+
+app.post('/api/cosmoterra/import-prices', (req, res) => {
+  const body = req.body || {};
+  const products = body.products;
+  if (!Array.isArray(products) || products.length === 0) {
+    return res.status(400).json({ error: 'Ungültiges Dateiformat: Es wird ein JSON-Array mit Produkten erwartet.' });
+  }
+
+  const prev = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  const prevEffective = cosmoterraCatalog.getEffectiveCatalog(prev);
+  const prevByNr = new Map();
+  for (const p of [...prevEffective.leftProducts, ...prevEffective.rightProducts]) {
+    prevByNr.set(p.nr, p);
+  }
+
+  const stand = String(body.stand || '').trim() || prev.cosmoterra_price_stand || '11/2026';
+  const catalogNrs = new Set([
+    ...cosmoterraCatalog.LEFT_PRODUCTS.map(p => p.nr),
+    ...cosmoterraCatalog.RIGHT_PRODUCTS.map(p => p.nr)
+  ]);
+
+  const overrides = {};
+  let matchedCount = 0;
+  let changedPriceCount = 0;
+
+  for (const rawItem of products) {
+    if (!rawItem || typeof rawItem !== 'object') continue;
+    const rawNr = String(rawItem.art_nr || '').trim();
+    if (!rawNr) continue;
+
+    const price = parseNumeric(rawItem.preis_brutto);
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({ error: `Ungültiger Preis bei Artikel ${rawNr}.` });
+    }
+
+    const rawWm = rawItem.wertmarken !== undefined && rawItem.wertmarken !== null
+      ? parseNumeric(rawItem.wertmarken)
+      : NaN;
+    const entry = { price: Math.round(price * 100) / 100 };
+    if (Number.isFinite(rawWm) && rawWm >= 0) {
+      entry.wertmarken = rawWm;
+    }
+
+    overrides[rawNr] = entry;
+    const mappedNr = rawNr === '120330' ? '120320' : rawNr;
+    if (rawNr === '120330') {
+      overrides['120320'] = entry;
+    }
+
+    if (catalogNrs.has(mappedNr)) {
+      matchedCount++;
+      const prevProd = prevByNr.get(mappedNr);
+      if (prevProd && Math.abs(entry.price - prevProd.price) > 0.001) {
+        changedPriceCount++;
+      }
+    }
+  }
+
+  if (matchedCount === 0) {
+    return res.status(400).json({ error: 'Keine bekannten Cosmoterra-Artikelnummern in dieser JSON-Datei gefunden.' });
+  }
+
+  const overridesJson = JSON.stringify(overrides);
+  db.prepare('UPDATE settings SET cosmoterra_price_stand = ?, cosmoterra_price_overrides = ? WHERE id = 1')
+    .run(stand, overridesJson);
+
+  const updated = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+  logAction(
+    'settings',
+    1,
+    'UPDATE',
+    `Cosmoterra-Preisliste importiert (Stand ${stand}, ${matchedCount} Produkte, ${changedPriceCount} Preisänderungen)`,
+    prev,
+    updated
+  );
+
+  const preview = formatInvoiceNumber(updated, new Date().toISOString().slice(0, 10), updated.next_sequence);
+  res.json({
+    settings: { ...updated, preview_next: preview },
+    stats: { stand, matchedCount, changedPriceCount, totalEntries: products.length }
+  });
+});
+
 app.post('/api/cosmoterra/preview', async (req, res) => {
   try {
     const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
@@ -968,12 +1133,11 @@ app.post('/api/cosmoterra/invoices', async (req, res) => {
     const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(customerId);
     if (!customer) return res.status(404).json({ error: 'Kunde nicht gefunden' });
 
-    const summary = computeCosmoterraSummary(body);
+    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
+    const summary = computeCosmoterraSummary(body, settings);
     if (summary.itemCount === 0) {
       return res.status(400).json({ error: 'Bitte mindestens eine Artikelmenge, freie Zeile oder ein Geschenk erfassen.' });
     }
-
-    const settings = db.prepare('SELECT * FROM settings WHERE id = 1').get();
     const invoiceDate = (body.invoice_date || new Date().toISOString().slice(0, 10)).trim();
     const { nextSeq, invYear, invoiceNumber, usedGeneratedSeq, sequenceNum } =
       resolveInvoiceNumberAndSequence(settings, invoiceDate, body.invoice_number);
@@ -1305,7 +1469,7 @@ app.post('/api/undo', (req, res) => {
         UPDATE settings
         SET prefix_schema = ?, suffix_schema = ?, number_digits = ?, next_sequence = ?, yearly_reset = ?, last_reset_year = ?, default_sort_order = ?,
             cosmoterra_enabled = ?, cosmoterra_partner_mode = ?, cosmoterra_partner_name = ?, cosmoterra_partner_address = ?, cosmoterra_partner_gp_nr = ?, cosmoterra_partner_image = ?,
-            cosmoterra_gift_text = ?
+            cosmoterra_gift_text = ?, cosmoterra_price_stand = ?, cosmoterra_price_overrides = ?
         WHERE id = 1
       `).run(
         prev.prefix_schema,
@@ -1321,7 +1485,9 @@ app.post('/api/undo', (req, res) => {
         prev.cosmoterra_partner_address || '',
         prev.cosmoterra_partner_gp_nr || '',
         prev.cosmoterra_partner_image || '',
-        prev.cosmoterra_gift_text || 'Geschenk von Herzen von deinem Berater {NAME}'
+        prev.cosmoterra_gift_text || 'Geschenk von Herzen von deinem Berater {NAME}',
+        prev.cosmoterra_price_stand || '11/2026',
+        prev.cosmoterra_price_overrides || '{}'
       );
     }
 

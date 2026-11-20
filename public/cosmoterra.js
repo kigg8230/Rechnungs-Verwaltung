@@ -80,6 +80,11 @@ function syncCosmoterraUI() {
     if (giftTextEl) {
       giftTextEl.value = (appSettings.cosmoterra_gift_text || '').trim() || DEFAULT_COSMOTERRA_GIFT_TEXT;
     }
+    const standBadge = document.getElementById('ct-set-price-stand-badge');
+    if (standBadge) {
+      const stand = (appSettings.cosmoterra_price_stand || '').trim() || '11/2026';
+      standBadge.textContent = `Aktiver Stand: ${stand}`;
+    }
 
     const mode = appSettings.cosmoterra_partner_mode === 'image' ? 'image' : 'text';
     const radios = document.querySelectorAll('input[name="ct-set-partner-mode"]');
@@ -225,11 +230,71 @@ async function deleteCosmoterraPartnerImage() {
   }
 }
 
+function onCosmoterraPriceFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  const standInput = document.getElementById('ct-import-stand');
+  if (!file || !standInput) return;
+  const match = file.name.match(/(0[1-9]|1[0-2])[-_](\d{4})/);
+  if (match) {
+    standInput.value = `${match[1]}/${match[2]}`;
+  }
+}
+
+async function importCosmoterraPriceList() {
+  const fileInput = document.getElementById('ct-import-json-input');
+  const standInput = document.getElementById('ct-import-stand');
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) {
+    showToast('Bitte zuerst eine JSON-Preisliste auswählen.', 'error');
+    return;
+  }
+
+  try {
+    const rawText = await file.text();
+    const products = JSON.parse(rawText);
+    if (!Array.isArray(products) || products.length === 0) {
+      showToast('Ungültiges JSON-Format: Erwartet wird ein Array aus Produkt-Einträgen.', 'error');
+      return;
+    }
+
+    const stand = (standInput?.value || '').trim() || (appSettings?.cosmoterra_price_stand || '11/2026');
+    if (!confirm(`Preisliste "${file.name}" (${products.length} Einträge) als Stand "${stand}" importieren?`)) {
+      return;
+    }
+
+    const res = await fetch('/api/cosmoterra/import-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stand, products })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      appSettings = data.settings;
+      syncCosmoterraUI();
+      await loadAuditLogs();
+      fileInput.value = '';
+      if (standInput) standInput.value = '';
+      showToast(
+        `Preisliste Stand ${data.stats.stand} importiert (${data.stats.matchedCount} Produkte, ${data.stats.changedPriceCount} Preisänderungen)!`,
+        'success',
+        true
+      );
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Import fehlgeschlagen', 'error');
+    }
+  } catch (err) {
+    showToast('JSON-Datei konnte nicht gelesen werden: ' + err.message, 'error');
+  }
+}
+
 // ==================== EDITOR MODAL LIFECYCLE ====================
 function resetCosmoterraEditorState() {
   const cat = window.COSMOTERRA_CATALOG;
+  const effective = cat.getEffectiveCatalog(appSettings);
   ctItemsState = {};
-  for (const p of [...cat.LEFT_PRODUCTS, ...cat.RIGHT_PRODUCTS]) {
+  for (const p of [...effective.leftProducts, ...effective.rightProducts]) {
     const key = `${p.side}:${p.rowIndex}`;
     ctItemsState[key] = {
       side: p.side,
@@ -316,6 +381,12 @@ function openCosmoterraModal() {
   }
 
   document.getElementById('ct-gift-footer-text').textContent = resolveCosmoterraGiftText(appSettings);
+
+  const standEl = document.getElementById('ct-sheet-price-stand');
+  if (standEl) {
+    const effective = window.COSMOTERRA_CATALOG.getEffectiveCatalog(appSettings);
+    standEl.textContent = `Stand ${effective.priceStand} • Digitaler Cosmoterra Vordruck`;
+  }
 
   document.getElementById('ct-product-search').value = '';
   document.getElementById('ct-inv-desc').value = '';
@@ -631,7 +702,8 @@ function computeTotalWertmarken() {
     totalWm += q * (Number(item.wertmarken) || 0);
   }
 
-  const wmLookup = (window.COSMOTERRA_CATALOG && window.COSMOTERRA_CATALOG.WERTMARKEN_BY_NR) || {};
+  const wmLookup =
+    (window.COSMOTERRA_CATALOG && window.COSMOTERRA_CATALOG.getEffectiveCatalog(appSettings).wertmarkenByNr) || {};
   for (const row of ctManualRows) {
     if (row.isAutoWertmarken || row.isAction || row.isGift) continue;
     const nr = (row.nr || '').trim();
